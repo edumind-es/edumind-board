@@ -1,0 +1,505 @@
+import { z } from "zod";
+
+export const allowedEmbedHosts = [
+  "phet.colorado.edu",
+  "www.youtube.com",
+  "youtube.com",
+  "www.youtube-nocookie.com",
+  "open.spotify.com",
+  "w.soundcloud.com",
+  "player.vimeo.com",
+  "vimeo.com",
+  "canva.com",
+  "www.canva.com",
+  "santillana.es",
+  "anaya.es",
+  "anayaeducacion.es",
+  "grupoanaya.es",
+  "educamos.sm",
+  "grupo-sm.com",
+  "smconectados.com",
+  "smsavia.com",
+  "savia-digital.com",
+  "edumind.es",
+  "board.edumind.es",
+  "pasos.edumind.es",
+  "motion.edumind.es",
+  "breath.edumind.es",
+  "miapp.edumind.es",
+  "recursos.edumind.es"
+] as const;
+
+export const allowedInstitutionalEmbedSuffixes = [
+  "edu.xunta.gal",
+  "educa.madrid.org",
+  "educa.jcyl.es",
+  "edu.gva.es",
+  "educarex.es",
+  "educarm.es",
+  "educa.aragon.es",
+  "educantabria.es",
+  "educastur.es",
+  "xtec.cat",
+  "juntadeandalucia.es"
+] as const;
+
+export function isAllowedEmbedUrl(url: string) {
+  try {
+    const parsed = new URL(url);
+    if (!["https:", "http:"].includes(parsed.protocol)) return false;
+    if (parsed.protocol === "http:" && parsed.hostname !== "localhost") return false;
+    return allowedEmbedHosts.some(
+      (host) => parsed.hostname === host || parsed.hostname.endsWith(`.${host}`)
+    ) || allowedInstitutionalEmbedSuffixes.some(
+      (suffix) => parsed.hostname === suffix || parsed.hostname.endsWith(`.${suffix}`)
+    );
+  } catch {
+    return false;
+  }
+}
+
+export const boardElementTypeSchema = z.enum([
+  "text",
+  "note",
+  "image",
+  "file",
+  "iframe",
+  "timer",
+  "semaphore",
+  "clock",
+  "dice",
+  "spinner",
+  "guidelines",
+  "math",
+  "base10",
+  "fraction",
+  "algorithm",
+  "logic",
+  "grid",
+  "drawing",
+  "noise",
+  "qr",
+  "table",
+  "comment",
+  "connector",
+  "flow",
+  "pictos",
+  "hub"
+]);
+
+export const themeSchema = z.enum(["edumind", "eink", "ocean", "forest"]);
+
+export const elementBaseSchema = z.object({
+  id: z.string().uuid(),
+  type: boardElementTypeSchema,
+  x: z.number(),
+  y: z.number(),
+  width: z.number().min(40).max(2400),
+  height: z.number().min(40).max(1800),
+  rotation: z.number().default(0),
+  zIndex: z.number().int().default(0),
+  opacity: z.number().min(0).max(1).default(1),
+  locked: z.boolean().default(false)
+});
+
+export const textElementSchema = elementBaseSchema.extend({
+  type: z.literal("text"),
+  data: z.object({
+    text: z.string().max(4000),
+    fontSize: z.number().min(12).max(120).default(32),
+    color: z.string().default("#22302f")
+  })
+});
+
+export const noteElementSchema = elementBaseSchema.extend({
+  type: z.literal("note"),
+  data: z.object({
+    text: z.string().max(4000),
+    color: z.string().default("#fff3c4")
+  })
+});
+
+export const imageElementSchema = elementBaseSchema.extend({
+  type: z.literal("image"),
+  data: z.object({
+    url: z.string().url(),
+    alt: z.string().max(240).default("")
+  })
+});
+
+export const fileElementSchema = elementBaseSchema.extend({
+  type: z.literal("file"),
+  data: z.object({
+    url: z.string().refine((value) => value.startsWith("data:") || value.startsWith("https://")),
+    name: z.string().min(1).max(240),
+    mimeType: z.enum(["application/pdf", "image/jpeg", "image/png"]),
+    kind: z.enum(["pdf", "image"])
+  })
+});
+
+export const iframeElementSchema = elementBaseSchema.extend({
+  type: z.literal("iframe"),
+  data: z.object({
+    url: z.string().url().refine(isAllowedEmbedUrl, "Embed host is not allowed"),
+    title: z.string().max(160).default("Recurso embebido")
+  })
+});
+
+export const timerElementSchema = elementBaseSchema.extend({
+  type: z.literal("timer"),
+  data: z.object({
+    label: z.string().max(120).default("Temporizador"),
+    initialSeconds: z.number().int().min(0).max(7200).default(300),
+    seconds: z.number().int().min(0).max(7200).default(300),
+    running: z.boolean().default(false),
+    style: z.enum(["classic", "focus", "minimal"]).default("classic"),
+    accentColor: z.string().default("#c45d3e")
+  })
+});
+
+export const semaphoreElementSchema = elementBaseSchema.extend({
+  type: z.literal("semaphore"),
+  data: z.object({
+    state: z.enum(["red", "yellow", "green"]).default("green"),
+    label: z.string().max(120).default("Semaforo")
+  })
+});
+
+// ── Nuevos widgets Fase 1 ────────────────────────────────────────────────────
+
+export const clockElementSchema = elementBaseSchema.extend({
+  type: z.literal("clock"),
+  data: z.object({
+    style: z.enum(["digital", "analog"]).default("digital"),
+    showSeconds: z.boolean().default(true),
+    color: z.string().default("#22302f"),
+    bgColor: z.string().default("#fffaf0")
+  })
+});
+
+export const diceElementSchema = elementBaseSchema.extend({
+  type: z.literal("dice"),
+  data: z.object({
+    value: z.number().int().min(1).max(100).default(1),
+    sides: z.number().int().min(2).max(100).default(6),
+    color: z.string().default("#c45d3e")
+  })
+});
+
+export const spinnerElementSchema = elementBaseSchema.extend({
+  type: z.literal("spinner"),
+  data: z.object({
+    items: z.array(z.string().max(80)).max(60).default([]),
+    result: z.string().nullable().default(null)
+  })
+});
+
+export const guidelinesElementSchema = elementBaseSchema.extend({
+  type: z.literal("guidelines"),
+  data: z.object({
+    style: z.enum(["montessori", "double", "normal"]).default("montessori"),
+    lineColor: z.string().default("#2a7a6d"),
+    bgColor: z.string().default("#fffdf4"),
+    lines: z.number().int().min(1).max(30).default(6)
+  })
+});
+
+export const mathElementSchema = elementBaseSchema.extend({
+  type: z.literal("math"),
+  data: z.object({
+    operation: z.enum(["sum", "subtract", "multiply", "divide"]).default("sum"),
+    operandA: z.string().max(20).default(""),
+    operandB: z.string().max(20).default(""),
+    result: z.string().max(20).default(""),
+    showResult: z.boolean().default(false),
+    fontSize: z.number().min(16).max(120).default(48)
+  })
+});
+
+export const baseTenElementSchema = elementBaseSchema.extend({
+  type: z.literal("base10"),
+  data: z.object({
+    unitCount: z.number().int().min(0).max(99).default(4),
+    rodCount: z.number().int().min(0).max(99).default(3),
+    flatCount: z.number().int().min(0).max(30).default(2),
+    cubeCount: z.number().int().min(0).max(10).default(0),
+    mode: z.enum(["placeValue", "free"]).default("placeValue"),
+    pieces: z.array(z.object({
+      id: z.string().uuid(),
+      kind: z.enum(["unit", "rod", "flat", "cube"]),
+      x: z.number(),
+      y: z.number()
+    })).max(300).default([]),
+    style: z.enum(["2d", "3d"]).default("2d"),
+    showValue: z.boolean().default(true),
+    showPlaceLabels: z.boolean().default(true)
+  })
+});
+
+export const fractionElementSchema = elementBaseSchema.extend({
+  type: z.literal("fraction"),
+  data: z.object({
+    numerator: z.number().int().min(0).max(24).default(1),
+    denominator: z.number().int().min(1).max(24).default(2),
+    model: z.enum(["bar", "circle", "set"]).default("bar"),
+    compareNumerator: z.number().int().min(0).max(24).default(1),
+    compareDenominator: z.number().int().min(1).max(24).default(3),
+    showCompare: z.boolean().default(false),
+    showLabels: z.boolean().default(true),
+    color: z.string().default("#e75f3c")
+  })
+});
+
+export const algorithmElementSchema = elementBaseSchema.extend({
+  type: z.literal("algorithm"),
+  data: z.object({
+    operation: z.enum(["add", "subtract", "multiply", "divide"]).default("add"),
+    operandA: z.string().regex(/^\d{0,6}$/).default("234"),
+    operandB: z.string().regex(/^\d{0,6}$/).default("156"),
+    result: z.string().max(16).regex(/^\d{0,8}(?:\s*r\s*\d{0,6})?$/i).default(""),
+    strategy: z.enum(["placeValue", "areaModel", "birdBeak", "standard"]).default("placeValue"),
+    showResult: z.boolean().default(false),
+    showPlaceValue: z.boolean().default(true),
+    showGrid: z.boolean().default(true)
+  })
+});
+
+export const logicElementSchema = elementBaseSchema.extend({
+  type: z.literal("logic"),
+  data: z.object({
+    mode: z.enum(["pattern", "count", "sort"]).default("pattern"),
+    pattern: z.array(z.enum(["circle", "square", "triangle", "star"])).min(1).max(8).default(["circle", "square", "circle"]),
+    colors: z.array(z.string()).min(1).max(8).default(["#e75f3c", "#0f8f83", "#1a5fa8"]),
+    repeatCount: z.number().int().min(2).max(16).default(9),
+    hiddenIndex: z.number().int().min(-1).max(31).default(5),
+    showAnswer: z.boolean().default(false),
+    targetCount: z.number().int().min(1).max(20).default(6)
+  })
+});
+
+export const hubElementSchema = elementBaseSchema.extend({
+  type: z.literal("hub"),
+  data: z.object({
+    appId: z.enum(["motion", "pasos", "quiz", "robotics", "miapp", "breath"]).default("motion"),
+    mode: z.enum(["express", "embed"]).default("express")
+  })
+});
+
+export const pictogramSequenceElementSchema = elementBaseSchema.extend({
+  type: z.literal("pictos"),
+  data: z.object({
+    title: z.string().max(120).default("Secuencia visual"),
+    mode: z.enum(["sequence", "pattern"]).default("sequence"),
+    activeIndex: z.number().int().min(0).max(23).default(0),
+    showLights: z.boolean().default(true),
+    repeatCount: z.number().int().min(2).max(12).default(6),
+    items: z.array(z.object({
+      id: z.number().int().positive(),
+      label: z.string().max(80),
+      url: z.string().url(),
+      source: z.literal("arasaac").default("arasaac")
+    })).max(24).default([])
+  })
+});
+
+export const tableElementSchema = elementBaseSchema.extend({
+  type: z.literal("table"),
+  data: z.object({
+    rows: z.number().int().min(1).max(12).default(3),
+    cols: z.number().int().min(1).max(8).default(3),
+    // Celdas en array plano fila×col (row-major)
+    cells: z.array(z.string().max(120)).max(96).default([]),
+    headerRow: z.boolean().default(true),
+    borderColor: z.string().default("#3d3a36"),
+    headerBg: z.string().default("#c9c4bb"),
+    fontSize: z.number().min(8).max(48).default(18)
+  })
+});
+
+export const gridElementSchema = elementBaseSchema.extend({
+  type: z.literal("grid"),
+  data: z.object({
+    cellSize: z.number().min(10).max(120).default(25),
+    lineColor: z.string().default("#a8c8a0"),
+    bgColor: z.string().default("#f8fff6"),
+    boldEvery: z.number().int().min(2).max(10).default(5)
+  })
+});
+
+export const drawingElementSchema = elementBaseSchema.extend({
+  type: z.literal("drawing"),
+  data: z.object({
+    strokes: z.array(z.array(z.number())).max(500).default([]),
+    strokeColor: z.string().default("#22302f"),
+    strokeWidth: z.number().min(1).max(30).default(3),
+    bgColor: z.string().default("#ffffff"),
+    drawMode: z.boolean().default(true)
+  })
+});
+
+export const noiseElementSchema = elementBaseSchema.extend({
+  type: z.literal("noise"),
+  data: z.object({
+    threshold: z.number().min(10).max(90).default(50),
+    label: z.string().max(80).default("Nivel de ruido"),
+    color: z.string().default("#c45d3e")
+  })
+});
+
+export const qrElementSchema = elementBaseSchema.extend({
+  type: z.literal("qr"),
+  data: z.object({
+    text: z.string().max(500).default("https://edumind.es"),
+    label: z.string().max(120).default(""),
+    bgColor: z.string().default("#ffffff"),
+    fgColor: z.string().default("#22302f")
+  })
+});
+
+export const commentElementSchema = elementBaseSchema.extend({
+  type: z.literal("comment"),
+  data: z.object({
+    text: z.string().max(1200).default("Comentario"),
+    author: z.string().max(120).default("Equipo"),
+    status: z.enum(["open", "resolved", "blocked"]).default("open"),
+    color: z.string().default("#fff3c4"),
+    createdAt: z.string().datetime().default(() => new Date().toISOString())
+  })
+});
+
+export const connectorElementSchema = elementBaseSchema.extend({
+  type: z.literal("connector"),
+  data: z.object({
+    label: z.string().max(160).default(""),
+    color: z.string().default("#1a5fa8"),
+    strokeWidth: z.number().min(1).max(16).default(4),
+    style: z.enum(["straight", "elbow", "dashed"]).default("straight"),
+    arrowStart: z.boolean().default(false),
+    arrowEnd: z.boolean().default(true)
+  })
+});
+
+export const flowElementSchema = elementBaseSchema.extend({
+  type: z.literal("flow"),
+  data: z.object({
+    text: z.string().max(600).default("Paso"),
+    shape: z.enum(["process", "decision", "terminator", "data"]).default("process"),
+    fill: z.string().default("#ffffff"),
+    stroke: z.string().default("#2a7a6d"),
+    textColor: z.string().default("#22302f"),
+    fontSize: z.number().min(10).max(64).default(22)
+  })
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+
+export const boardElementSchema = z.discriminatedUnion("type", [
+  textElementSchema,
+  noteElementSchema,
+  imageElementSchema,
+  fileElementSchema,
+  iframeElementSchema,
+  timerElementSchema,
+  semaphoreElementSchema,
+  clockElementSchema,
+  diceElementSchema,
+  spinnerElementSchema,
+  guidelinesElementSchema,
+  mathElementSchema,
+  baseTenElementSchema,
+  fractionElementSchema,
+  algorithmElementSchema,
+  logicElementSchema,
+  gridElementSchema,
+  tableElementSchema,
+  pictogramSequenceElementSchema,
+  drawingElementSchema,
+  noiseElementSchema,
+  qrElementSchema,
+  commentElementSchema,
+  connectorElementSchema,
+  flowElementSchema,
+  hubElementSchema
+]);
+
+export const boardInkObjectSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("stroke"),
+    points: z.array(z.number()).min(4).max(2000),
+    color: z.string().default("#22302f"),
+    width: z.number().min(1).max(30).default(4),
+    anchorElementId: z.string().uuid().optional()
+  }),
+  z.object({
+    kind: z.enum([
+      "line",
+      "rect",
+      "ellipse",
+      "triangle",
+      "angle",
+      "angleMeasure",
+      "baseUnit",
+      "baseRod",
+      "baseFlat",
+      "hexagon",
+      "polygon",
+      "cube",
+      "pyramid",
+      "triangularPrism",
+      "cylinder",
+      "cone",
+      "sphere"
+    ]),
+    x: z.number(),
+    y: z.number(),
+    w: z.number(),
+    h: z.number(),
+    color: z.string().default("#22302f"),
+    width: z.number().min(1).max(30).default(4),
+    sides: z.number().int().min(3).max(24).optional(),
+    showMeasurements: z.boolean().optional(),
+    anchorElementId: z.string().uuid().optional()
+  })
+]);
+
+export const boardDocumentSchema = z.object({
+  schemaVersion: z.literal(1),
+  id: z.string().uuid(),
+  title: z.string().min(1).max(160),
+  theme: themeSchema.default("edumind"),
+  viewport: z.object({
+    x: z.number().default(0),
+    y: z.number().default(0),
+    zoom: z.number().min(0.1).max(4).default(1)
+  }),
+  elements: z.array(boardElementSchema).max(250),
+  ink: z.array(boardInkObjectSchema).max(1000).default([]),
+  updatedAt: z.string().datetime()
+});
+
+export const createBoardSchema = z.object({
+  title: z.string().min(1).max(160).default("Nuevo board")
+});
+
+export const publishBoardSchema = z.object({
+  board: boardDocumentSchema
+});
+
+export const createShareSchema = z.object({
+  expiresAt: z.string().datetime().optional()
+});
+
+export function assertBoardEmbedsAllowed(board: BoardDocument) {
+  const blocked = board.elements.filter(
+    (element) => element.type === "iframe" && !isAllowedEmbedUrl(element.data.url)
+  );
+  if (blocked.length > 0) {
+    throw new Error("Board contains iframe URLs outside the allowed embed list");
+  }
+}
+
+export type BoardElementType = z.infer<typeof boardElementTypeSchema>;
+export type BoardElement = z.infer<typeof boardElementSchema>;
+export type BoardInkObject = z.infer<typeof boardInkObjectSchema>;
+export type BoardDocument = z.infer<typeof boardDocumentSchema>;
+export type ThemeName = z.infer<typeof themeSchema>;
