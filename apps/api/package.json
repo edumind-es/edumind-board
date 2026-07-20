@@ -12,17 +12,17 @@
   },
   "dependencies": {
     "@edumind-board/shared": "*",
-    "@fastify/cors": "^11.2.0",
-    "@fastify/helmet": "^13.0.2",
+    "@fastify/cors": "^11.3.0",
+    "@fastify/helmet": "^13.1.0",
     "@fastify/rate-limit": "^10.3.0",
     "better-sqlite3": "^11.5.0",
-    "fastify": "^5.8.5",
+    "fastify": "^5.10.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.11",
     "@types/node": "^22.7.4",
-    "tsx": "^4.19.1",
+    "tsx": "^4.23.1",
     "typescript": "^5.6.3"
   },
   "license": "(AGPL-3.0-or-later OR EUPL-1.2)"
