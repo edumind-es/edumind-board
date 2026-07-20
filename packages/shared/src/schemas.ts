@@ -58,6 +58,22 @@ export function isAllowedEmbedUrl(url: string) {
   }
 }
 
+// Sitios que casi siempre bloquean el framing (X-Frame-Options / CSP): portales
+// y LMS institucionales con login. No pueden verse dentro de un iframe, así que
+// se añaden como tarjeta-lanzador («abrir en pestaña nueva») en vez de un frame
+// en blanco. El docente puede forzar modo embed en el Inspector si una página
+// concreta sí lo permite.
+export function shouldLaunchInNewTab(url: string) {
+  try {
+    const hostname = new URL(url).hostname;
+    return allowedInstitutionalEmbedSuffixes.some(
+      (suffix) => hostname === suffix || hostname.endsWith(`.${suffix}`)
+    );
+  } catch {
+    return false;
+  }
+}
+
 export const boardElementTypeSchema = z.enum([
   "text",
   "note",
@@ -84,7 +100,10 @@ export const boardElementTypeSchema = z.enum([
   "connector",
   "flow",
   "pictos",
-  "hub"
+  "hub",
+  "mates3d",
+  "mindmap",
+  "dictadoNum"
 ]);
 
 export const themeSchema = z.enum(["edumind", "eink", "ocean", "forest"]);
@@ -130,7 +149,13 @@ export const imageElementSchema = elementBaseSchema.extend({
 export const fileElementSchema = elementBaseSchema.extend({
   type: z.literal("file"),
   data: z.object({
-    url: z.string().refine((value) => value.startsWith("data:") || value.startsWith("https://")),
+    // data: (modo local), https:// (producción) o http://localhost* (API en desarrollo)
+    url: z.string().refine((value) =>
+      value.startsWith("data:") ||
+      value.startsWith("https://") ||
+      value.startsWith("/api/uploads/") ||
+      value.startsWith("http://localhost")
+    ),
     name: z.string().min(1).max(240),
     mimeType: z.enum(["application/pdf", "image/jpeg", "image/png"]),
     kind: z.enum(["pdf", "image"])
@@ -141,7 +166,10 @@ export const iframeElementSchema = elementBaseSchema.extend({
   type: z.literal("iframe"),
   data: z.object({
     url: z.string().url().refine(isAllowedEmbedUrl, "Embed host is not allowed"),
-    title: z.string().max(160).default("Recurso embebido")
+    title: z.string().max(160).default("Recurso embebido"),
+    // "embed" = iframe en el tablero; "launcher" = tarjeta con botón que abre en
+    // pestaña nueva (para sitios que prohíben el framing, como EVA/LMS).
+    mode: z.enum(["embed", "launcher"]).default("embed")
   })
 });
 
@@ -274,6 +302,98 @@ export const logicElementSchema = elementBaseSchema.extend({
     hiddenIndex: z.number().int().min(-1).max(31).default(5),
     showAnswer: z.boolean().default(false),
     targetCount: z.number().int().min(1).max(20).default(6)
+  })
+});
+
+// ── Dictado numérico ────────────────────────────────────────────────────────
+
+export const numeroFormaSchema = z.enum(["cifra", "letra", "romano", "ordinal", "base10"]);
+
+export const dictadoNumericoElementSchema = elementBaseSchema.extend({
+  type: z.literal("dictadoNum"),
+  data: z.object({
+    // Formas habilitadas en el sorteo (el docente elige en el panel)
+    forms: z.array(numeroFormaSchema).min(1).default(["cifra", "letra"]),
+    min: z.number().int().min(0).max(9999).default(1),
+    max: z.number().int().min(0).max(9999).default(100),
+    current: z.number().int().min(0).max(9999).default(24),
+    form: numeroFormaSchema.default("letra"),
+    showAnswer: z.boolean().default(false),
+    accent: z.string().default("#1a5fa8")
+  })
+});
+
+// ── Mapa mental / conceptual (estilo CmapTools) ─────────────────────────────
+
+export const mindmapNodeSchema = z.object({
+  id: z.string().min(1),
+  text: z.string().max(400).default("Idea"),
+  // Posición local dentro del widget, en px
+  x: z.number(),
+  y: z.number(),
+  color: z.string().default("#2a7a6d"),
+  shape: z.enum(["rounded", "pill", "rect", "ellipse"]).default("rounded")
+});
+
+export const mindmapEdgeSchema = z.object({
+  id: z.string().min(1),
+  from: z.string().min(1),
+  to: z.string().min(1),
+  // Frase de enlace estilo mapa conceptual ("es un", "provoca", …)
+  label: z.string().max(160).default("")
+});
+
+export const mindmapElementSchema = elementBaseSchema.extend({
+  type: z.literal("mindmap"),
+  data: z.object({
+    variant: z.enum(["mindmap", "concept"]).default("mindmap"),
+    nodes: z.array(mindmapNodeSchema).max(200).default([]),
+    edges: z.array(mindmapEdgeSchema).max(400).default([]),
+    accent: z.string().default("#2a7a6d"),
+    edgeStyle: z.enum(["curved", "elbow", "straight"]).default("curved"),
+    background: z.string().default("#fbfaf7")
+  })
+});
+
+// ── Manipulativos matemáticos 3D reales (WebGL) ─────────────────────────────
+
+export const solid3dKindSchema = z.enum([
+  "cube",
+  "sphere",
+  "cylinder",
+  "cone",
+  "pyramid",
+  "prism"
+]);
+
+export const mates3dPieceSchema = z.object({
+  id: z.string().uuid(),
+  kind: z.enum(["unit", "rod", "flat", "cube"]),
+  // Posición en el plano del suelo, en unidades de mundo (1 = un cubo unidad)
+  x: z.number().min(-60).max(60),
+  z: z.number().min(-60).max(60),
+  rotY: z.number().default(0)
+});
+
+export const mates3dElementSchema = elementBaseSchema.extend({
+  type: z.literal("mates3d"),
+  data: z.object({
+    mode: z.enum(["base10", "solids"]).default("base10"),
+    // Escena Base 10
+    pieces: z.array(mates3dPieceSchema).max(200).default([]),
+    showValue: z.boolean().default(true),
+    // Explorador de sólidos
+    solid: solid3dKindSchema.default("cube"),
+    // Número de lados de la base para prisma y pirámide (3–12)
+    solidSides: z.number().int().min(3).max(12).default(4),
+    solidColor: z.string().default("#2a7a6d"),
+    solidTransparent: z.boolean().default(false),
+    showEdges: z.boolean().default(true),
+    showVertices: z.boolean().default(false),
+    showCounts: z.boolean().default(true),
+    // Cámara persistida por board (posición y punto de mira)
+    cameraPosition: z.tuple([z.number(), z.number(), z.number()]).default([16, 14, 22]),
+    cameraTarget: z.tuple([z.number(), z.number(), z.number()]).default([0, 0, 0])
   })
 });
 
@@ -419,7 +539,10 @@ export const boardElementSchema = z.discriminatedUnion("type", [
   commentElementSchema,
   connectorElementSchema,
   flowElementSchema,
-  hubElementSchema
+  hubElementSchema,
+  mates3dElementSchema,
+  mindmapElementSchema,
+  dictadoNumericoElementSchema
 ]);
 
 export const boardInkObjectSchema = z.discriminatedUnion("kind", [
@@ -477,6 +600,42 @@ export const boardDocumentSchema = z.object({
   updatedAt: z.string().datetime()
 });
 
+export const activityMaterialSchema = z.object({
+  id: z.string().uuid(),
+  type: z.enum(["widget", "resource", "link", "file", "manipulative", "instruction"]),
+  title: z.string().min(1).max(160),
+  description: z.string().max(800).default(""),
+  url: z.string().url().optional(),
+  widgetType: boardElementTypeSchema.optional()
+});
+
+export const activityStepSchema = z.object({
+  id: z.string().uuid(),
+  title: z.string().min(1).max(160),
+  teacherNotes: z.string().max(2000).default(""),
+  studentPrompt: z.string().max(2000).default(""),
+  durationMinutes: z.number().int().min(0).max(180).default(0),
+  boardElementIds: z.array(z.string().uuid()).max(80).default([]),
+  expectedEvidence: z.enum(["none", "photo", "audio", "text", "boardSnapshot"]).default("none")
+});
+
+export const activitySchema = z.object({
+  schemaVersion: z.literal(1),
+  id: z.string().uuid(),
+  title: z.string().min(1).max(160),
+  objective: z.string().max(1200).default(""),
+  profileId: z.string().max(80).default("general"),
+  estimatedTimeMinutes: z.number().int().min(0).max(480).default(0),
+  materials: z.array(activityMaterialSchema).max(80).default([]),
+  steps: z.array(activityStepSchema).min(1).max(40),
+  evidencePolicy: z.enum(["none", "optional", "required"]).default("optional"),
+  boardTemplateId: z.string().max(120).optional(),
+  board: boardDocumentSchema.optional(),
+  createdBy: z.string().uuid().optional(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+
 export const createBoardSchema = z.object({
   title: z.string().min(1).max(160).default("Nuevo board")
 });
@@ -499,7 +658,14 @@ export function assertBoardEmbedsAllowed(board: BoardDocument) {
 }
 
 export type BoardElementType = z.infer<typeof boardElementTypeSchema>;
+export type Solid3dKind = z.infer<typeof solid3dKindSchema>;
+export type Mates3dPiece = z.infer<typeof mates3dPieceSchema>;
+export type MindmapNode = z.infer<typeof mindmapNodeSchema>;
+export type MindmapEdge = z.infer<typeof mindmapEdgeSchema>;
 export type BoardElement = z.infer<typeof boardElementSchema>;
 export type BoardInkObject = z.infer<typeof boardInkObjectSchema>;
 export type BoardDocument = z.infer<typeof boardDocumentSchema>;
+export type ActivityMaterial = z.infer<typeof activityMaterialSchema>;
+export type ActivityStep = z.infer<typeof activityStepSchema>;
+export type Activity = z.infer<typeof activitySchema>;
 export type ThemeName = z.infer<typeof themeSchema>;

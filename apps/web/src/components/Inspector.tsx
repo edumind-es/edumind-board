@@ -5,6 +5,7 @@ import { searchArasaac as searchArasaacApi, type ArasaacPictogram } from "../lib
 import { useBoardStore } from "../lib/store";
 import { HUB_APPS } from "../lib/hubApps";
 import { newId } from "../lib/ids";
+import { confirmDialog } from "./ui/feedback";
 
 function fieldValue(element: BoardElement, key: string) {
   const value = (element.data as Record<string, unknown>)[key];
@@ -19,11 +20,13 @@ function estimateNoteHeight(text: string, widthPx: number, fontSize: number): nu
 }
 
 function createBase10InspectorPieces(data: Extract<BoardElement, { type: "base10" }>["data"], width: number) {
-  const unit = 10;
+  const unit = Math.max(12, Math.min(18, width / 44));
+  const depthX = unit * 0.34;
+  const depthY = unit * 0.28;
   const metrics = (kind: "unit" | "rod" | "flat" | "cube") => ({
-    unit: { width: unit, height: unit },
-    rod: { width: unit * 10, height: unit },
-    flat: { width: unit * 10, height: unit * 10 },
+    unit: { width: unit + depthX, height: unit + depthY },
+    rod: { width: unit * 10 + unit * 0.95, height: unit * 1.7 },
+    flat: { width: unit * 10.8, height: unit * 10.6 },
     cube: { width: unit * 10, height: unit * 10 }
   }[kind]);
   const pieces: Extract<BoardElement, { type: "base10" }>["data"]["pieces"] = [];
@@ -80,7 +83,7 @@ export function Inspector() {
     note: "Nota", text: "Texto", image: "Imagen", file: "Archivo",
     iframe: "Web", timer: "Temporizador", semaphore: "Semáforo",
     clock: "Reloj", dice: "Dado", spinner: "Ruleta",
-    guidelines: "Pauta escritura", math: "Matemáticas", base10: "Base 10",
+    guidelines: "Pauta escritura", math: "Matemáticas", base10: "Base 10", mates3d: "Mates 3D", mindmap: "Mapa mental", dictadoNum: "Dictado numérico",
     fraction: "Fracciones", algorithm: "Algoritmo", logic: "Lógica matemática",
     grid: "Cuadrícula", table: "Tabla",
     comment: "Comentario",
@@ -181,6 +184,16 @@ export function Inspector() {
           <label>URL <input value={fieldValue(element, "url")} onChange={(e) => updateElementData(element.id, { url: e.target.value })} placeholder="https://..." /></label>
           {!isAllowedEmbedUrl(fieldValue(element, "url")) && fieldValue(element, "url") && (
             <p className="warning">Dominio no permitido para publicar. Usa plataformas admitidas como PhET, YouTube, Vimeo, Canva, Spotify, SoundCloud, editoriales permitidas, dominios EDUmind y entornos educativos oficiales de consejerías.</p>
+          )}
+          <label>
+            Cómo mostrarlo
+            <select value={element.data.mode} onChange={(e) => updateElementData(element.id, { mode: e.target.value })}>
+              <option value="embed">En el tablero (iframe)</option>
+              <option value="launcher">Tarjeta · abrir en pestaña nueva</option>
+            </select>
+          </label>
+          {element.data.mode === "embed" && (
+            <p className="inspector-hint">Si el recurso sale en blanco, el sitio prohíbe verse embebido: cambia a «Tarjeta».</p>
           )}
         </>
       )}
@@ -769,7 +782,7 @@ export function Inspector() {
           </label>
           <label>Color de fondo <input type="color" value={element.data.bgColor} onChange={(e) => updateElementData(element.id, { bgColor: e.target.value })} /></label>
           <button type="button" className="danger"
-            onClick={() => { if (confirm("¿Borrar todos los trazos?")) updateElementData(element.id, { strokes: [] }); }}>
+            onClick={() => { void confirmDialog({ title: "Borrar lienzo", message: "¿Borrar todos los trazos?", confirmLabel: "Borrar", danger: true }).then((ok) => { if (ok) updateElementData(element.id, { strokes: [] }); }); }}>
             Borrar lienzo
           </button>
         </>
@@ -886,6 +899,151 @@ export function Inspector() {
       )}
 
       {/* ── App EDUmind (Hub) ──────────────────────────────────────────────── */}
+
+      {element.type === "dictadoNum" && (
+        <>
+          <p className="inspector-hint">Qué representaciones pueden salir (se sortean al azar):</p>
+          {([
+            ["cifra", "Cifra (24)"],
+            ["letra", "Letra (veinticuatro)"],
+            ["romano", "Números romanos (XXIV)"],
+            ["ordinal", "Ordinal (vigésimo cuarto)"],
+            ["base10", "Base 10 (bloques)"]
+          ] as const).map(([value, label]) => {
+            const enabled = element.data.forms.includes(value);
+            return (
+              <label className="checkbox" key={value}>
+                <input type="checkbox" checked={enabled}
+                  onChange={(e) => {
+                    const next = e.target.checked
+                      ? [...element.data.forms, value]
+                      : element.data.forms.filter((f) => f !== value);
+                    if (next.length > 0) updateElementData(element.id, { forms: next });
+                  }} />
+                {label}
+              </label>
+            );
+          })}
+          <label>Desde
+            <input type="number" min={0} max={9999} value={element.data.min}
+              onChange={(e) => updateElementData(element.id, { min: Math.max(0, Math.min(9999, Number(e.target.value) || 0)) })} />
+          </label>
+          <label>Hasta
+            <input type="number" min={0} max={9999} value={element.data.max}
+              onChange={(e) => updateElementData(element.id, { max: Math.max(0, Math.min(9999, Number(e.target.value) || 0)) })} />
+          </label>
+          <label>Color <input type="color" value={element.data.accent}
+            onChange={(e) => updateElementData(element.id, { accent: e.target.value })} /></label>
+          <p className="inspector-hint">
+            El board muestra un número al azar en una de las formas activas.
+            «Siguiente» sortea otro; «Respuesta» revela la cifra. Romano solo 1–3999.
+          </p>
+        </>
+      )}
+
+      {element.type === "mindmap" && (
+        <>
+          <label>
+            Tipo de mapa
+            <select value={element.data.variant}
+              onChange={(e) => updateElementData(element.id, { variant: e.target.value })}>
+              <option value="mindmap">Mapa mental (ramas)</option>
+              <option value="concept">Mapa conceptual (con frases de enlace)</option>
+            </select>
+          </label>
+          <label>
+            Estilo de enlace
+            <select value={element.data.edgeStyle}
+              onChange={(e) => updateElementData(element.id, { edgeStyle: e.target.value })}>
+              <option value="curved">Curvo</option>
+              <option value="elbow">En ángulo</option>
+              <option value="straight">Recto</option>
+            </select>
+          </label>
+          <label>Color base <input type="color" value={element.data.accent}
+            onChange={(e) => updateElementData(element.id, { accent: e.target.value })} /></label>
+          <label>Fondo <input type="color" value={element.data.background}
+            onChange={(e) => updateElementData(element.id, { background: e.target.value })} /></label>
+          <p className="inspector-hint">
+            Doble clic en una idea para editarla · «+» añade una idea enlazada ·
+            «Enlazar» conecta dos ideas · «Auto-organizar» reparte el mapa en radial.
+          </p>
+        </>
+      )}
+
+      {element.type === "mates3d" && (
+        <>
+          <label>
+            Modo
+            <select
+              value={element.data.mode}
+              onChange={(e) => updateElementData(element.id, { mode: e.target.value })}
+            >
+              <option value="base10">Bloques Base 10 (valor posicional)</option>
+              <option value="solids">Cuerpos geométricos</option>
+            </select>
+          </label>
+          {element.data.mode === "base10" && (
+            <>
+              <label className="checkbox">
+                <input type="checkbox" checked={element.data.showValue}
+                  onChange={(e) => updateElementData(element.id, { showValue: e.target.checked })} />
+                Mostrar valor total
+              </label>
+              <p className="inspector-hint">
+                Arrastra las piezas sobre el suelo con volumen real: 10 unidades caben
+                exactamente en una decena. Los canjes se hacen desde los botones de la escena.
+              </p>
+            </>
+          )}
+          {element.data.mode === "solids" && (
+            <>
+              <label>
+                Sólido
+                <select
+                  value={element.data.solid}
+                  onChange={(e) => updateElementData(element.id, { solid: e.target.value })}
+                >
+                  <option value="cube">Cubo</option>
+                  <option value="prism">Prisma (n lados)</option>
+                  <option value="pyramid">Pirámide (n lados)</option>
+                  <option value="cylinder">Cilindro</option>
+                  <option value="cone">Cono</option>
+                  <option value="sphere">Esfera</option>
+                </select>
+              </label>
+              {(element.data.solid === "prism" || element.data.solid === "pyramid") && (
+                <label>Lados de la base ({element.data.solidSides})
+                  <input type="range" min={3} max={12} value={element.data.solidSides}
+                    onChange={(e) => updateElementData(element.id, { solidSides: Number(e.target.value) })} />
+                </label>
+              )}
+              <label>Color <input type="color" value={element.data.solidColor}
+                onChange={(e) => updateElementData(element.id, { solidColor: e.target.value })} /></label>
+              <label className="checkbox">
+                <input type="checkbox" checked={element.data.solidTransparent}
+                  onChange={(e) => updateElementData(element.id, { solidTransparent: e.target.checked })} />
+                Transparente (ver interior)
+              </label>
+              <label className="checkbox">
+                <input type="checkbox" checked={element.data.showEdges}
+                  onChange={(e) => updateElementData(element.id, { showEdges: e.target.checked })} />
+                Resaltar aristas
+              </label>
+              <label className="checkbox">
+                <input type="checkbox" checked={element.data.showVertices}
+                  onChange={(e) => updateElementData(element.id, { showVertices: e.target.checked })} />
+                Marcar vértices
+              </label>
+              <label className="checkbox">
+                <input type="checkbox" checked={element.data.showCounts}
+                  onChange={(e) => updateElementData(element.id, { showCounts: e.target.checked })} />
+                Mostrar fórmula de Euler
+              </label>
+            </>
+          )}
+        </>
+      )}
 
       {element.type === "hub" && (
         <>

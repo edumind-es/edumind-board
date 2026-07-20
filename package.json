@@ -2,19 +2,21 @@
   "name": "edumind-board",
   "private": true,
   "version": "0.1.0",
+  "author": "Luis Vilela Acuña <contacto@edumind.es>",
   "description": "EDUmind Board: PWA docente local-first para tableros de aula.",
   "workspaces": [
     "packages/*",
     "apps/*"
   ],
   "scripts": {
-    "dev": "npm run dev:web",
+    "dev": "node scripts/dev.mjs",
     "dev:web": "npm --workspace @edumind-board/web run dev",
     "dev:api": "npm --workspace @edumind-board/api run dev",
     "build": "npm run build --workspaces",
     "typecheck": "npm run typecheck --workspaces",
     "lint": "npm run lint --workspaces",
     "check:contracts": "node scripts/check-production-contracts.mjs",
+    "test": "npm --workspace @edumind-board/api run test",
     "smoke:web": "npm --workspace @edumind-board/web run smoke"
   },
   "engines": {

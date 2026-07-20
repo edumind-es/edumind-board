@@ -79,7 +79,7 @@ export function createElement(type: BoardElement["type"]): BoardElement {
     case "iframe":
       return {
         ...base, type, width: 520, height: 320,
-        data: { url: "https://phet.colorado.edu/", title: "Recurso web" }
+        data: { url: "https://phet.colorado.edu/", title: "Recurso web", mode: "embed" }
       };
 
     case "timer":
@@ -137,7 +137,7 @@ export function createElement(type: BoardElement["type"]): BoardElement {
           cubeCount: 0,
           mode: "placeValue",
           pieces: [],
-          style: "2d",
+          style: "3d",
           showValue: true,
           showPlaceLabels: true
         }
@@ -281,6 +281,69 @@ export function createElement(type: BoardElement["type"]): BoardElement {
         }
       };
 
+    case "mates3d":
+      // Escena inicial con 123 (1 centena, 2 decenas, 3 unidades):
+      // el docente ve el manipulativo funcionando desde el primer segundo
+      return {
+        ...base, type, width: 960, height: 620,
+        data: {
+          mode: "base10",
+          pieces: [
+            { id: newId(), kind: "flat", x: -12, z: -8, rotY: 0 },
+            { id: newId(), kind: "rod", x: 2, z: 6, rotY: 0 },
+            { id: newId(), kind: "rod", x: 2, z: 9, rotY: 0 },
+            { id: newId(), kind: "unit", x: 12, z: 12, rotY: 0 },
+            { id: newId(), kind: "unit", x: 14, z: 12, rotY: 0 },
+            { id: newId(), kind: "unit", x: 16, z: 12, rotY: 0 }
+          ],
+          showValue: true,
+          solid: "cube",
+          solidSides: 4,
+          solidColor: "#2a7a6d",
+          solidTransparent: false,
+          showEdges: true,
+          showVertices: false,
+          showCounts: true,
+          cameraPosition: [16, 14, 22],
+          cameraTarget: [0, 0, 0]
+        }
+      };
+
+    case "mindmap": {
+      // Mapa de ejemplo: un tema central con tres ramas, listo para usar
+      const root = newId(), a = newId(), b = newId(), c = newId();
+      return {
+        ...base, type, width: 720, height: 480,
+        data: {
+          variant: "mindmap",
+          accent: "#2a7a6d",
+          edgeStyle: "curved",
+          background: "#fbfaf7",
+          nodes: [
+            { id: root, text: "Tema central", x: 360, y: 240, color: "#2a7a6d", shape: "rounded" },
+            { id: a, text: "Idea 1", x: 170, y: 130, color: "#c45d3e", shape: "rounded" },
+            { id: b, text: "Idea 2", x: 560, y: 150, color: "#1a5fa8", shape: "rounded" },
+            { id: c, text: "Idea 3", x: 380, y: 400, color: "#8b5cf6", shape: "rounded" }
+          ],
+          edges: [
+            { id: newId(), from: root, to: a, label: "" },
+            { id: newId(), from: root, to: b, label: "" },
+            { id: newId(), from: root, to: c, label: "" }
+          ]
+        }
+      };
+    }
+
+    case "dictadoNum":
+      return {
+        ...base, type, width: 420, height: 300,
+        data: {
+          forms: ["cifra", "letra", "romano"],
+          min: 1, max: 100, current: 24, form: "letra",
+          showAnswer: false, accent: "#1a5fa8"
+        }
+      };
+
     default:
       return { ...base, type: "note", data: { text: "Nueva nota", color: "#fff3c4" } };
   }
@@ -307,18 +370,63 @@ export function createFileElement(file: {
 }
 
 // Crea un elemento iframe con URL y título predefinidos (presets web y música).
-export function createIframePreset(url: string, title: string): BoardElement {
+export function createIframePreset(
+  url: string,
+  title: string,
+  mode: "embed" | "launcher" = "embed"
+): BoardElement {
   const isMusic = title === "Música";
+  // El lanzador es una tarjeta compacta (no un frame a tamaño de recurso).
+  const width = mode === "launcher" ? 300 : isMusic ? 620 : 560;
+  const height = mode === "launcher" ? 172 : isMusic ? 220 : 360;
   return {
     id: newId(),
     type: "iframe",
     x: 160, y: 160,
-    width: isMusic ? 620 : 560,
-    height: isMusic ? 220 : 360,
+    width,
+    height,
     rotation: 0,
     zIndex: Date.now(),
     opacity: 1,
     locked: false,
-    data: { url, title }
+    data: { url, title, mode }
+  };
+}
+
+export type Mates3dSolidKind = "cube" | "sphere" | "cylinder" | "cone" | "pyramid" | "prism";
+
+// Crea un widget Mates 3D en modo sólidos, ya centrado en el cuerpo indicado.
+// Se usa al "abrir en 3D" un sólido dibujado en el lienzo: aristas y vértices
+// visibles para explorar caras/aristas/vértices y la fórmula de Euler.
+export function createMates3dSolid(
+  solid: Mates3dSolidKind,
+  sides: number,
+  position?: { x: number; y: number }
+): BoardElement {
+  return {
+    id: newId(),
+    type: "mates3d",
+    x: position?.x ?? 200,
+    y: position?.y ?? 160,
+    width: 620,
+    height: 460,
+    rotation: 0,
+    zIndex: Date.now(),
+    opacity: 1,
+    locked: false,
+    data: {
+      mode: "solids",
+      pieces: [],
+      showValue: true,
+      solid,
+      solidSides: Math.max(3, Math.min(12, Math.round(sides))),
+      solidColor: "#2a7a6d",
+      solidTransparent: false,
+      showEdges: true,
+      showVertices: true,
+      showCounts: true,
+      cameraPosition: [16, 14, 22],
+      cameraTarget: [0, 4, 0]
+    }
   };
 }

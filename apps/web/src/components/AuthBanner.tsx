@@ -15,11 +15,11 @@ export function AuthBanner() {
   return (
     <div className="auth-banner" role="status" aria-live="polite">
       <span className="auth-banner-text">
-        <strong>Modo local</strong> · Los boards se guardan solo en este dispositivo.
-        Inicia sesión con tu cuenta EDUmind para guardar en la nube y acceder desde cualquier lugar.
+        <strong>Modo local</strong> · Tus tableros se guardan en este dispositivo, sin cuenta ni conexión.
+        Conecta tu cuenta EDUmind para sincronizarlos en la nube, compartir en vivo y publicar.
       </span>
       <a className="auth-banner-login" href={getLoginUrl()}>
-        Iniciar sesión
+        Conectar cuenta
       </a>
       <button
         type="button"

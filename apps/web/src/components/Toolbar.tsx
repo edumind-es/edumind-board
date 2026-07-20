@@ -1,148 +1,50 @@
+import { useState } from "react";
 import {
-  AlignLeft, ArrowRight, BookOpen, Calculator, Clock, Cuboid, Dices, Divide, FileText,
-  FilePlus2, Grid2x2, Image, Images, Link2, Maximize2, Mic, PenLine, LayoutGrid,
-  MessageSquareText, Music, Puzzle, QrCode, RefreshCw, Square, StickyNote, TrafficCone, Youtube, Smartphone, Workflow
+  BookOpen,
+  ClipboardList,
+  FilePlus2,
+  LayoutDashboard,
+  Link2,
+  Maximize2,
+  MousePointer2,
+  Music,
+  PenLine,
+  Square,
+  Trash2,
+  Youtube
 } from "lucide-react";
-// PenLine se usa para el botón de Lienzo global
 import type { LucideIcon } from "lucide-react";
-import { isAllowedEmbedUrl, type BoardElement } from "@edumind-board/shared";
+import { isAllowedEmbedUrl, shouldLaunchInNewTab } from "@edumind-board/shared";
+import { toYouTubeEmbedUrl } from "../lib/music";
+import { MusicPanel } from "./MusicPanel";
+import { ACTIVITY_BLUEPRINTS, type ActivityBlueprint } from "../activities/catalog";
 import { useBoardStore } from "../lib/store";
 import { createIframePreset } from "../lib/boardFactory";
-
-type Tool = { type: BoardElement["type"]; label: string; icon: LucideIcon };
-
-const toolsAula: Tool[] = [
-  { type: "semaphore", label: "Semáforo", icon: TrafficCone },
-  { type: "timer",    label: "Timer",    icon: Clock },
-  { type: "clock",   label: "Reloj",    icon: Clock },
-  { type: "dice",    label: "Dado",     icon: Dices },
-  { type: "spinner", label: "Ruleta",   icon: RefreshCw }
-];
-
-const toolsContenido: Tool[] = [
-  { type: "note",  label: "Nota",    icon: StickyNote },
-  { type: "text",  label: "Texto",   icon: FileText },
-  { type: "image", label: "Imagen",  icon: Image },
-  { type: "comment", label: "Comentario", icon: MessageSquareText },
-  { type: "connector", label: "Flecha", icon: ArrowRight },
-  { type: "flow", label: "Diagrama", icon: Workflow }
-];
-
-const toolsEdu: Tool[] = [
-  { type: "guidelines", label: "Pauta",      icon: AlignLeft },
-  { type: "math",       label: "Mate",       icon: Calculator },
-  { type: "base10",     label: "Base 10",    icon: Cuboid },
-  { type: "fraction",   label: "Fracción",   icon: Divide },
-  { type: "algorithm",  label: "Algoritmo",  icon: Calculator },
-  { type: "logic",      label: "Lógica",     icon: Puzzle },
-  { type: "grid",       label: "Cuadrícula", icon: Grid2x2 },
-  { type: "table",      label: "Tabla",      icon: LayoutGrid },
-  { type: "pictos",     label: "Pictos",     icon: Images },
-  { type: "noise",      label: "Ruido",      icon: Mic },
-  { type: "qr",         label: "QR",         icon: QrCode },
-  { type: "hub",        label: "App Hub",    icon: Smartphone }
-];
+import { CLASSROOM_PROFILES, type ClassroomProfile } from "../profiles/profiles";
+import { WIDGET_GROUPS, getWidgetDefinitions, type WidgetGroup } from "../widgets/registry";
+import { confirmDialog, toast } from "./ui/feedback";
 
 type IframePreset = { label: string; icon: LucideIcon; url: string; title: string };
+type ActivePanel = WidgetGroup | "profile" | "activities" | "music" | null;
 
 const iframePresets: IframePreset[] = [
   { label: "Música",  icon: Music,   url: "", title: "Música" },
   { label: "YouTube", icon: Youtube, url: "https://www.youtube-nocookie.com/embed/", title: "YouTube" }
 ];
 
-function toYouTubeEmbedUrl(rawUrl: string) {
-  try {
-    const url = new URL(rawUrl.trim());
-    const host = url.hostname.replace(/^www\./, "");
-    let videoId = "";
-    const playlistId = url.searchParams.get("list") ?? "";
-
-    if (host === "youtu.be") {
-      videoId = url.pathname.split("/").filter(Boolean)[0] ?? "";
-    } else if (host === "youtube.com" || host === "youtube-nocookie.com") {
-      if (url.pathname.startsWith("/embed/videoseries")) {
-        return playlistId ? `https://www.youtube-nocookie.com/embed/videoseries?list=${encodeURIComponent(playlistId)}` : rawUrl.trim();
-      } else if (url.pathname.startsWith("/embed/")) {
-        videoId = url.pathname.split("/").filter(Boolean)[1] ?? "";
-      } else if (url.pathname.startsWith("/shorts/")) {
-        videoId = url.pathname.split("/").filter(Boolean)[1] ?? "";
-      } else {
-        videoId = url.searchParams.get("v") ?? "";
-      }
-    }
-
-    if ((!videoId || url.pathname.startsWith("/playlist")) && playlistId) {
-      return `https://www.youtube-nocookie.com/embed/videoseries?list=${encodeURIComponent(playlistId)}`;
-    }
-    return videoId ? `https://www.youtube-nocookie.com/embed/${videoId}` : rawUrl.trim();
-  } catch {
-    return rawUrl.trim();
-  }
-}
-
-function toSpotifyEmbedUrl(rawUrl: string) {
-  try {
-    const url = new URL(rawUrl.trim());
-    const host = url.hostname.replace(/^www\./, "");
-    if (host !== "open.spotify.com") return rawUrl.trim();
-
-    const parts = url.pathname.split("/").filter(Boolean);
-    const embedIndex = parts[0] === "embed" ? 1 : 0;
-    const type = parts[embedIndex] ?? "";
-    const id = parts[embedIndex + 1] ?? "";
-    const allowedTypes = new Set(["album", "artist", "episode", "playlist", "show", "track"]);
-    if (!allowedTypes.has(type) || !id) return rawUrl.trim();
-
-    const embedUrl = new URL(`https://open.spotify.com/embed/${type}/${id}`);
-    embedUrl.searchParams.set("utm_source", "edumind_board");
-    return embedUrl.toString();
-  } catch {
-    return rawUrl.trim();
-  }
-}
-
-function toSoundCloudEmbedUrl(rawUrl: string) {
-  try {
-    const url = new URL(rawUrl.trim());
-    const host = url.hostname.replace(/^www\./, "");
-    if (host === "w.soundcloud.com") return rawUrl.trim();
-    if (host !== "soundcloud.com") return rawUrl.trim();
-
-    const embedUrl = new URL("https://w.soundcloud.com/player/");
-    embedUrl.searchParams.set("url", url.toString());
-    embedUrl.searchParams.set("auto_play", "false");
-    embedUrl.searchParams.set("hide_related", "true");
-    embedUrl.searchParams.set("show_comments", "false");
-    embedUrl.searchParams.set("show_user", "true");
-    embedUrl.searchParams.set("show_reposts", "false");
-    embedUrl.searchParams.set("visual", "false");
-    return embedUrl.toString();
-  } catch {
-    return rawUrl.trim();
-  }
-}
-
-function toMusicEmbedUrl(rawUrl: string) {
-  const trimmed = rawUrl.trim();
-  try {
-    const url = new URL(trimmed);
-    const host = url.hostname.replace(/^www\./, "");
-    if (host === "youtu.be" || host === "youtube.com" || host === "youtube-nocookie.com") {
-      return toYouTubeEmbedUrl(trimmed);
-    }
-    if (host === "open.spotify.com") return toSpotifyEmbedUrl(trimmed);
-    if (host === "soundcloud.com" || host === "w.soundcloud.com") return toSoundCloudEmbedUrl(trimmed);
-    return trimmed;
-  } catch {
-    return trimmed;
-  }
-}
-
 export function Toolbar({
+  activeProfile,
+  onSelectProfile,
+  onCreateFromProfile,
+  onCreateActivity,
   onPresent,
   onImportAsset,
   onOpenResources
 }: {
+  activeProfile: ClassroomProfile;
+  onSelectProfile: (profile: ClassroomProfile) => void;
+  onCreateFromProfile: (profile: ClassroomProfile) => void;
+  onCreateActivity: (activity: ActivityBlueprint) => void;
   onPresent: () => void;
   onImportAsset: () => void;
   onOpenResources: () => void;
@@ -150,30 +52,38 @@ export function Toolbar({
   const addElement = useBoardStore((s) => s.addElement);
   const addElementObject = useBoardStore((s) => s.addElementObject);
   const setSelectedId = useBoardStore((s) => s.setSelectedId);
+  const inkCount = useBoardStore((s) => s.board?.ink?.length ?? 0);
   const globalInkMode = useBoardStore((s) => s.globalInkMode);
+  const setGlobalInkMode = useBoardStore((s) => s.setGlobalInkMode);
   const toggleGlobalInkMode = useBoardStore((s) => s.toggleGlobalInkMode);
+  const [activePanel, setActivePanel] = useState<ActivePanel>(null);
+  const favoriteWidgets = getWidgetDefinitions(activeProfile.favoriteWidgetTypes);
+
+  const activeGroup = typeof activePanel === "object" ? activePanel : null;
+  const profilePanelOpen = activePanel === "profile";
+  const activitiesPanelOpen = activePanel === "activities";
 
   function addWebEmbed() {
     const url = window.prompt("URL https:// para embeber en el board", "https://phet.colorado.edu/");
     if (!url) return;
     const normalizedUrl = url.includes("youtube") || url.includes("youtu.be") ? toYouTubeEmbedUrl(url) : url.trim();
     if (!isAllowedEmbedUrl(normalizedUrl)) {
-      alert("Ese dominio no está permitido para embeber. Usa PhET, YouTube, Vimeo, Canva, Spotify, SoundCloud o apps EDUmind.");
+      toast("Ese dominio no está permitido. Usa PhET, YouTube, Vimeo, Canva, Spotify, SoundCloud, portales educativos oficiales o apps EDUmind.", "error");
       return;
     }
-    addElementObject(createIframePreset(normalizedUrl, "Recurso web"));
+    // Los LMS/portales institucionales (EVA, EducaMadrid…) prohíben el framing:
+    // se añaden como tarjeta-lanzador en vez de un iframe que saldría en blanco.
+    const launch = shouldLaunchInNewTab(normalizedUrl);
+    addElementObject(createIframePreset(normalizedUrl, "Recurso web", launch ? "launcher" : "embed"));
+    if (launch) {
+      toast("Este sitio no permite verse embebido (por seguridad). Lo he añadido como tarjeta para abrirlo en una pestaña nueva.", "info");
+    }
   }
 
   function addPresetEmbed(preset: IframePreset) {
     if (preset.label === "Música") {
-      const url = window.prompt("Pega una URL de YouTube, Spotify o SoundCloud", "https://open.spotify.com/playlist/");
-      if (!url) return;
-      const embedUrl = toMusicEmbedUrl(url);
-      if (!isAllowedEmbedUrl(embedUrl)) {
-        alert("No he podido convertir ese enlace. Usa YouTube, Spotify o SoundCloud con enlaces públicos/embebibles.");
-        return;
-      }
-      addElementObject(createIframePreset(embedUrl, "Música"));
+      // Abre el panel de música por modo de trabajo (con playlists curadas).
+      setActivePanel((current) => (current === "music" ? null : "music"));
       return;
     }
     if (preset.label === "YouTube") {
@@ -181,7 +91,7 @@ export function Toolbar({
       if (!url) return;
       const embedUrl = toYouTubeEmbedUrl(url);
       if (!isAllowedEmbedUrl(embedUrl) || !embedUrl.includes("/embed/")) {
-        alert("No he podido reconocer ese recurso de YouTube. Pega un vídeo o playlist pública.");
+        toast("No he podido reconocer ese recurso de YouTube. Pega un vídeo o playlist pública.", "error");
         return;
       }
       addElementObject(createIframePreset(embedUrl, "YouTube"));
@@ -190,29 +100,62 @@ export function Toolbar({
     addElementObject(createIframePreset(preset.url, preset.title));
   }
 
-  function renderTool(tool: Tool) {
-    const Icon = tool.icon;
-    // Reloj y Timer comparten icono Clock — distinguir por tipo en el DOM
-    const key = `${tool.type}-${tool.label}`;
-    return (
-      <button key={key} type="button" title={tool.label} onClick={() => addElement(tool.type)}>
-        <Icon size={22} />
-        <span>{tool.label}</span>
-      </button>
-    );
+  function activateDesktopSelector() {
+    setGlobalInkMode(false);
+    setSelectedId(null);
+    setActivePanel(null);
+  }
+
+  function clearInkCanvas() {
+    if (inkCount <= 0) return;
+    void confirmDialog({
+      title: "Limpiar lienzo",
+      message: "¿Limpiar todo el lienzo? Se borrarán dibujos, formas y trazos.",
+      confirmLabel: "Limpiar",
+      danger: true
+    }).then((accepted) => {
+      if (accepted) window.dispatchEvent(new CustomEvent("ink:clear"));
+    });
   }
 
   return (
+    <>
     <aside className="toolbar" aria-label="Herramientas">
-      {/* Aula */}
-      <div className="toolbar-group-label">Aula</div>
-      {toolsAula.map(renderTool)}
+      <div className="toolbar-group-label">Menú</div>
+      <button
+        type="button"
+        title={`Perfil: ${activeProfile.name}`}
+        className={profilePanelOpen ? "toolbar-ink-active" : ""}
+        onClick={() => setActivePanel((current) => current === "profile" ? null : "profile")}
+      >
+        <LayoutDashboard size={22} />
+        <span>{activeProfile.shortName}</span>
+      </button>
+      <button
+        type="button"
+        title="Actividades guiadas"
+        className={activitiesPanelOpen ? "toolbar-ink-active" : ""}
+        onClick={() => setActivePanel((current) => current === "activities" ? null : "activities")}
+      >
+        <ClipboardList size={22} />
+        <span>Actividades</span>
+      </button>
+      {WIDGET_GROUPS.map((group) => {
+        const Icon = group.icon;
+        return (
+          <button key={group.id} type="button" title={group.label}
+            className={activeGroup?.id === group.id ? "toolbar-ink-active" : ""}
+            onClick={() => setActivePanel((current) =>
+              typeof current === "object" && current?.id === group.id ? null : group
+            )}>
+            <Icon size={22} />
+            <span>{group.label}</span>
+          </button>
+        );
+      })}
 
       <div className="toolbar-divider-h" />
 
-      {/* Contenido */}
-      <div className="toolbar-group-label">Contenido</div>
-      {toolsContenido.map(renderTool)}
       <button type="button" title="PDF o imagen local" onClick={onImportAsset}>
         <FilePlus2 size={22} />
         <span>Archivo</span>
@@ -225,12 +168,6 @@ export function Toolbar({
         <BookOpen size={22} />
         <span>Recursos</span>
       </button>
-
-      <div className="toolbar-divider-h" />
-
-      {/* Educativo */}
-      <div className="toolbar-group-label">Educativo</div>
-      {toolsEdu.map(renderTool)}
 
       <div className="toolbar-divider-h" />
 
@@ -247,11 +184,23 @@ export function Toolbar({
       <div className="toolbar-divider-h" />
 
       {/* Lienzo global */}
+      <button type="button" title="Selector — mover, seleccionar o borrar elementos del escritorio"
+        className={!globalInkMode ? "toolbar-ink-active" : ""}
+        onClick={activateDesktopSelector}>
+        <MousePointer2 size={22} />
+        <span>Selector</span>
+      </button>
       <button type="button" title="Activar lienzo — dibuja sobre todo el board"
         className={globalInkMode ? "toolbar-ink-active" : ""}
         onClick={toggleGlobalInkMode}>
         <PenLine size={22} />
         <span>Lienzo</span>
+      </button>
+      <button type="button" title="Limpiar lienzo — borrar todos los trazos y formas"
+        disabled={inkCount <= 0}
+        onClick={clearInkCanvas}>
+        <Trash2 size={22} />
+        <span>Limpiar</span>
       </button>
 
       <div className="toolbar-divider-h" />
@@ -266,5 +215,100 @@ export function Toolbar({
         <span>PDI</span>
       </button>
     </aside>
+
+    {profilePanelOpen && (
+      <div className="tool-palette" role="dialog" aria-label="Perfil de aula">
+        <section>
+          <div className="tool-palette-title">Perfil de aula</div>
+          <div className="profile-menu-grid">
+            {CLASSROOM_PROFILES.map((profile) => (
+              <button
+                key={profile.id}
+                type="button"
+                className={profile.id === activeProfile.id ? "profile-menu-active" : ""}
+                title={profile.description}
+                onClick={() => onSelectProfile(profile)}
+              >
+                <span>{profile.emoji}</span>
+                <strong>{profile.shortName}</strong>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section>
+          <div className="tool-palette-title">Favoritos de {activeProfile.shortName}</div>
+          <div className="tool-palette-grid">
+            {favoriteWidgets.map((tool) => {
+              const Icon = tool.icon;
+              return (
+                <button key={`${activeProfile.id}-${tool.type}`} type="button" title={tool.label}
+                  onClick={() => { addElement(tool.type); setActivePanel(null); }}>
+                  <Icon size={18} />
+                  <span>{tool.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="tool-palette-actions">
+          <button type="button" className="primary" onClick={() => { onCreateFromProfile(activeProfile); setActivePanel(null); }}>
+            Crear board {activeProfile.shortName}
+          </button>
+        </section>
+      </div>
+    )}
+
+    {activeGroup && (
+      <div className="tool-palette" role="dialog" aria-label={`Herramientas de ${activeGroup.label}`}>
+        <section>
+          <div className="tool-palette-title">{activeGroup.label}</div>
+          <div className="tool-palette-grid">
+            {activeGroup.widgets.map((tool) => {
+              const Icon = tool.icon;
+              return (
+                <button key={`${tool.type}-${tool.label}`} type="button" title={tool.label}
+                  onClick={() => { addElement(tool.type); setActivePanel(null); }}>
+                  <Icon size={18} />
+                  <span>{tool.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      </div>
+    )}
+
+    {activitiesPanelOpen && (
+      <div className="tool-palette activity-tool-palette" role="dialog" aria-label="Actividades guiadas">
+        <section>
+          <div className="tool-palette-title">Actividades</div>
+          <div className="activity-tool-list">
+            {ACTIVITY_BLUEPRINTS.map((activity) => (
+              <button
+                key={activity.id}
+                type="button"
+                title={activity.objective}
+                onClick={() => {
+                  onCreateActivity(activity);
+                  setActivePanel(null);
+                }}
+              >
+                <strong>{activity.title}</strong>
+                <small>{activity.estimatedTimeMinutes} min · {activity.steps.length} pasos</small>
+              </button>
+            ))}
+          </div>
+        </section>
+      </div>
+    )}
+    {activePanel === "music" && (
+      <MusicPanel
+        onInsert={(embedUrl, title) => addElementObject(createIframePreset(embedUrl, title))}
+        onClose={() => setActivePanel(null)}
+      />
+    )}
+    </>
   );
 }

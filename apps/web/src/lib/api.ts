@@ -50,6 +50,65 @@ export async function publishBoard(board: BoardDocument) {
   );
 }
 
+// ── Sincronización de tableros local ↔ nube (requiere sesión) ──────────────
+
+export type RemoteBoardSummary = {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  publishedVersionId: string | null;
+};
+
+// Metadatos de los tableros del usuario en el servidor (para reconciliar).
+export async function listRemoteBoards() {
+  return apiFetch<{ boards: RemoteBoardSummary[] }>("/api/boards");
+}
+
+// Documento completo de un tablero del servidor.
+export async function fetchRemoteBoard(id: string) {
+  return apiFetch<{ board: BoardDocument }>(`/api/boards/${id}`);
+}
+
+// Resultado del push: "saved" si el servidor aceptó, "conflict" si el servidor
+// tenía una versión más nueva (se devuelve su copia para reconciliar).
+export type PushResult =
+  | { status: "saved"; updatedAt: string }
+  | { status: "conflict"; board: BoardDocument };
+
+// Guarda el borrador en el servidor (upsert). No usa apiFetch porque el 409 de
+// conflicto no es un error: trae la copia del servidor.
+export async function pushRemoteBoard(board: BoardDocument): Promise<PushResult> {
+  const response = await fetch(`${apiBaseUrl}/api/boards/${board.id}`, {
+    method: "PUT",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ board })
+  });
+
+  if (response.status === 409) {
+    const payload = (await response.json()) as { board: BoardDocument };
+    return { status: "conflict", board: payload.board };
+  }
+  if (!response.ok) {
+    throw new Error((await response.text()) || `Push falló con ${response.status}`);
+  }
+  const payload = (await response.json()) as { updatedAt: string };
+  return { status: "saved", updatedAt: payload.updatedAt };
+}
+
+// Borra el tablero del servidor. El 404 (no existía en la nube) se trata como
+// éxito silencioso: el objetivo —que no esté en el servidor— se cumple igual.
+export async function deleteRemoteBoard(id: string): Promise<void> {
+  const response = await fetch(`${apiBaseUrl}/api/boards/${id}`, {
+    method: "DELETE",
+    credentials: "include"
+  });
+  if (!response.ok && response.status !== 404) {
+    throw new Error((await response.text()) || `Borrado remoto falló con ${response.status}`);
+  }
+}
+
 export async function createShare(boardId: string) {
   return apiFetch<{ token: string; url: string; expiresAt: string | null }>(
     `/api/boards/${boardId}/share`,
@@ -78,6 +137,39 @@ export async function listResources(query = "") {
   if (query.trim()) params.set("q", query.trim());
   params.set("limit", "80");
   return apiFetch<{ resources: EduResource[] }>(`/api/resources?${params.toString()}`);
+}
+
+export type BoardVersionSummary = {
+  id: string;
+  versionNumber: number;
+  createdAt: string;
+  isPublished: boolean;
+};
+
+export async function listBoardVersions(boardId: string) {
+  return apiFetch<{ versions: BoardVersionSummary[] }>(`/api/boards/${boardId}/versions`);
+}
+
+export async function getBoardVersion(boardId: string, versionId: string) {
+  return apiFetch<{ version: { id: string; versionNumber: number; createdAt: string; board: BoardDocument } }>(
+    `/api/boards/${boardId}/versions/${versionId}`
+  );
+}
+
+// Sube un archivo al servidor (docente autenticado). El board guarda solo la
+// URL, no el base64: las versiones publicadas dejan de duplicar el archivo.
+export async function uploadAsset(file: File) {
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+  const dataBase64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
+  return apiFetch<{ id: string; url: string; name: string; mimeType: string; sizeBytes: number }>(
+    "/api/uploads",
+    { method: "POST", body: JSON.stringify({ name: file.name, mimeType: file.type, dataBase64 }) }
+  );
 }
 
 export async function searchArasaac(query: string) {

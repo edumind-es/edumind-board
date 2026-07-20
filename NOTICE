@@ -11,3 +11,23 @@ signs. See TRADEMARKS.md.
 Safe Creative registrations and timestamped authorship records may apply
 to the original works. These notices do not restrict the software license
 grants for the code released in this repository.
+
+Classroom desktop inspiration notice
+------------------------------------
+
+The "Escritorio docente" board template is inspired by the educational desktop
+approach of the open source project `jjdeharo/escritorio`.
+
+Upstream repository: https://github.com/jjdeharo/escritorio
+Reviewed upstream commit: 9c939e8c6bb2105a4e54ad4a21ffeb4ebd189523
+Repository author metadata: Juan Jose de Haro <jjdeharo@gmail.com>
+
+The upstream README credits the original "Escritorio Interactivo para el Aula"
+idea to Maria Teresa Gonzalez, and credits the React version/collaboration to
+Maria Teresa Gonzalez and Juan Jose de Haro. The upstream README states the
+project uses Creative Commons Attribution-ShareAlike 4.0 International
+(`CC BY-SA 4.0`): https://creativecommons.org/licenses/by-sa/4.0/
+
+This release does not copy source code, images, sounds or other assets from
+`jjdeharo/escritorio` for that template. Future direct reuse of upstream
+material must preserve the relevant CC BY-SA attribution and share-alike terms.

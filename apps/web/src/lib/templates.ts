@@ -65,7 +65,7 @@ function base10(x: number, y: number): Omit<BoardElement, "id"> {
       cubeCount: 0,
       mode: "placeValue",
       pieces: [],
-      style: "2d",
+      style: "3d",
       showValue: true,
       showPlaceLabels: true
     }
@@ -144,16 +144,17 @@ function qr(text: string, label: string, x: number, y: number): Omit<BoardElemen
   return { ...base(x, y, 220, 260), type: "qr", data: { text, label, bgColor: "#ffffff", fgColor: "#22302f" } };
 }
 function webEmbed(url: string, title: string, x: number, y: number, w = 560, h = 380): Omit<BoardElement, "id"> {
-  return { ...base(x, y, w, h), type: "iframe", data: { url, title } };
+  return { ...base(x, y, w, h), type: "iframe", data: { url, title, mode: "embed" } };
 }
 function hubApp(
   appId: Extract<BoardElement, { type: "hub" }>["data"]["appId"],
   x: number,
   y: number,
   w = 360,
-  h = 240
+  h = 240,
+  mode: Extract<BoardElement, { type: "hub" }>["data"]["mode"] = "express"
 ): Omit<BoardElement, "id"> {
-  return { ...base(x, y, w, h), type: "hub", data: { appId, mode: "express" } };
+  return { ...base(x, y, w, h), type: "hub", data: { appId, mode } };
 }
 
 // ── Plantillas ───────────────────────────────────────────────────────────────
@@ -418,6 +419,39 @@ export const BOARD_TEMPLATES: BoardTemplate[] = [
       hubApp("pasos", 80, 540, 390, 260),
       timer("Sprint", 900, 520, 540, "focus"),
       semaphore("Estado de aula", 820, 540)
+    ]
+  },
+  {
+    id: "escritorio-docente",
+    name: "Escritorio docente",
+    description: "Panel de aula con apps EDUmind, recursos, tiempos y estado de trabajo.",
+    category: "general",
+    emoji: "🖥️",
+    elements: [
+      note(
+        "ESCRITORIO DOCENTE\n\nAbre apps, recursos y consignas desde un unico board de clase.",
+        "#fffaf0",
+        40,
+        50,
+        360,
+        170
+      ),
+      hubApp("miapp", 430, 50, 250, 170),
+      hubApp("breath", 700, 50, 250, 170),
+      hubApp("pasos", 40, 250, 430, 300, "embed"),
+      hubApp("motion", 500, 250, 430, 300, "embed"),
+      webEmbed("https://recursos.edumind.es/", "Recursos EDUmind", 40, 590, 520, 340),
+      qr("https://edumind.es/apps-edumind/", "Apps EDUmind", 600, 590),
+      timer("Bloque de trabajo", 900, 600, 820, "focus"),
+      semaphore("Modo de aula", 750, 590),
+      note(
+        "Consigna visible:\n\n1. Entra en la app indicada\n2. Consulta el recurso\n3. Deja evidencia del trabajo",
+        "#d4edda",
+        600,
+        860,
+        350,
+        160
+      )
     ]
   }
 ];

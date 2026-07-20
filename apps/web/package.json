@@ -6,7 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "check:activities": "node scripts/check-activities.mjs",
+    "check:base10": "node scripts/check-base10.mjs",
     "check:geometry": "node scripts/check-geometry.mjs",
+    "check:space3d": "node scripts/check-space3d.mjs",
+    "check:dictados": "node scripts/check-dictados.mjs",
     "preview": "vite preview",
     "smoke": "node scripts/smoke-preview.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -14,6 +18,8 @@
   },
   "dependencies": {
     "@edumind-board/shared": "*",
+    "@react-three/drei": "^9.122.0",
+    "@react-three/fiber": "^8.18.0",
     "@vitejs/plugin-react": "^4.3.3",
     "idb": "^8.0.0",
     "konva": "^9.3.16",
@@ -22,6 +28,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-konva": "^18.2.10",
+    "three": "^0.185.1",
     "zod": "^3.23.8",
     "zustand": "^5.0.2"
   },
@@ -29,8 +36,10 @@
     "@types/qrcode": "^1.5.6",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
+    "@types/three": "^0.185.0",
     "typescript": "^5.6.3",
-    "vite": "^6.0.1"
+    "vite": "^6.0.1",
+    "vite-plugin-pwa": "^1.3.0"
   },
   "license": "(AGPL-3.0-or-later OR EUPL-1.2)"
 }

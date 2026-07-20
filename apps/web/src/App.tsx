@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { newId } from "./lib/ids";
-import { Circle, Copy, Library, LogIn, LogOut, Minus, RotateCcw, Save, Send, ShieldOff, User, Users, X, ZoomIn } from "lucide-react";
-import { boardDocumentSchema } from "@edumind-board/shared";
+import { BoxSelect, Circle, Cloud, CloudOff, Copy, History, Library, LogIn, LogOut, Magnet, Minus, Moon, RefreshCw, RotateCcw, Save, Send, ShieldOff, Sun, User, Users, X, ZoomIn } from "lucide-react";
+import { boardDocumentSchema, type Activity } from "@edumind-board/shared";
 import { AuthBanner } from "./components/AuthBanner";
+import { FeedbackHost, confirmDialog, toast } from "./components/ui/feedback";
+import { ActivityGuide } from "./components/ActivityGuide";
 import { AulaView } from "./components/AulaView";
 import { BoardCanvas } from "./components/BoardCanvas";
 import { BoardLibrary } from "./components/BoardLibrary";
@@ -12,15 +14,26 @@ import { GlobalInkToolbar } from "./components/GlobalInkToolbar";
 import { ProjectorView } from "./components/ProjectorView";
 import { ResourcePicker } from "./components/ResourcePicker";
 import { SalaPanel } from "./components/SalaPanel";
+import { VersionHistory } from "./components/VersionHistory";
 import { ShareView } from "./components/ShareView";
 import { Toolbar } from "./components/Toolbar";
+import { createActivity, type ActivityBlueprint } from "./activities/catalog";
 import { apiBaseUrl } from "./lib/api";
-import { createShare, listShares, publishBoard, revokeShare } from "./lib/api";
+import { createShare, deleteRemoteBoard, listShares, publishBoard, revokeShare, uploadAsset } from "./lib/api";
+import { pushBoard, reconcileBoards } from "./lib/sync";
 import { trackEvent, pruneOldEvents } from "./lib/analytics";
 import { isTrustedOrigin, type PluginMessage } from "./lib/hubApps";
 import { checkAuth, getLoginUrl, getLogoutUrl, type AuthState } from "./lib/auth";
+import { applyNoche, isNocheEnabled } from "./lib/projection";
 import { createEmptyBoard, createFileElement, createIframePreset } from "./lib/boardFactory";
-import { applyTemplate } from "./lib/templates";
+import { BOARD_TEMPLATES, applyTemplate } from "./lib/templates";
+import {
+  DEFAULT_PROFILE_ID,
+  DEFAULT_TEMPLATE_ID,
+  getClassroomProfile,
+  getClassroomProfileByTemplate,
+  type ClassroomProfile
+} from "./profiles/profiles";
 import {
   deleteBoardLocal,
   listBoardsLocal,
@@ -39,6 +52,16 @@ function statusText(state: string) {
   if (state === "published") return "Publicado";
   if (state === "error") return "Error al publicar";
   return "Guardado local";
+}
+
+type CloudSyncState = "idle" | "syncing" | "synced" | "offline" | "conflict";
+
+function cloudSyncText(state: CloudSyncState) {
+  if (state === "syncing") return "Sincronizando…";
+  if (state === "synced") return "Sincronizado";
+  if (state === "offline") return "Solo local";
+  if (state === "conflict") return "Conflicto resuelto";
+  return "";
 }
 
 function EditorApp() {
@@ -62,11 +85,20 @@ function EditorApp() {
   }, [_addElement]);
   const removeSelected = useBoardStore((state) => state.removeSelected);
   const duplicateSelected = useBoardStore((state) => state.duplicateSelected);
+  const copySelected = useBoardStore((state) => state.copySelected);
+  const cutSelected = useBoardStore((state) => state.cutSelected);
+  const pasteClipboard = useBoardStore((state) => state.pasteClipboard);
   const updateElement = useBoardStore((state) => state.updateElement);
   const undo = useBoardStore((state) => state.undo);
   const redo = useBoardStore((state) => state.redo);
+  const snapEnabled = useBoardStore((state) => state.snapEnabled);
+  const toggleSnap = useBoardStore((state) => state.toggleSnap);
+  const marqueeMode = useBoardStore((state) => state.marqueeMode);
+  const toggleMarqueeMode = useBoardStore((state) => state.toggleMarqueeMode);
 
   const [presentation, setPresentation] = useState(false);
+  const [nocheOn, setNocheOn] = useState(isNocheEnabled);
+  const [cloudSync, setCloudSync] = useState<CloudSyncState>("idle");
   const [libraryOpen, setLibraryOpen] = useState(true);
   const [resourcePickerOpen, setResourcePickerOpen] = useState(false);
   const [boards, setBoards] = useState<BoardSummary[]>([]);
@@ -75,7 +107,10 @@ function EditorApp() {
   const [salaCode, setSalaCode] = useState<string | null>(null);
   const [salaOpen, setSalaOpen] = useState(false);
   const [recording, setRecording] = useState(false);
+  const [versionsOpen, setVersionsOpen] = useState(false);
   const [recordFrames, setRecordFrames] = useState<string[]>([]);
+  const [activeProfileId, setActiveProfileId] = useState(DEFAULT_PROFILE_ID);
+  const [activeActivity, setActiveActivity] = useState<Activity | null>(null);
   const recordIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const captureFnRef = useRef<(() => string | null) | null>(null);
 
@@ -85,14 +120,26 @@ function EditorApp() {
     () => (shareToken ? `${window.location.origin}/share/${shareToken}` : null),
     [shareToken]
   );
+  const defaultTemplate = useMemo(
+    () => BOARD_TEMPLATES.find((template) => template.id === DEFAULT_TEMPLATE_ID),
+    []
+  );
+  const activeProfile = useMemo(
+    () => getClassroomProfile(activeProfileId) ?? getClassroomProfile(DEFAULT_PROFILE_ID)!,
+    [activeProfileId]
+  );
 
   const isAuthenticated = authState.status === "authenticated";
   const authUser = authState.status === "authenticated" ? authState.user : null;
 
   // Comprobación de auth al montar — falla silenciosamente a modo anónimo
   useEffect(() => {
-    checkAuth().then(setAuthState);
-  }, [authUser, isAuthenticated]);
+    let cancelled = false;
+    checkAuth().then((nextAuthState) => {
+      if (!cancelled) setAuthState(nextAuthState);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   const canUndo = _historyIndex > 0;
   const canRedo = _historyIndex < _history.length - 1;
@@ -101,7 +148,7 @@ function EditorApp() {
     setBoards(await listBoardsLocal());
   }
 
-  async function refreshShares(boardId: string) {
+  const refreshShares = useCallback(async (boardId: string) => {
     if (!isAuthenticated) return;
     try {
       const result = await listShares(boardId);
@@ -109,7 +156,7 @@ function EditorApp() {
     } catch {
       setActiveShares([]);
     }
-  }
+  }, [isAuthenticated]);
 
   const sessionStartRef = useRef(Date.now());
   const syncClientIdRef = useRef(newId());
@@ -157,13 +204,20 @@ function EditorApp() {
 
   useEffect(() => {
     loadLastBoardLocal().then((localBoard) => {
-      const initial = localBoard ?? createEmptyBoard();
+      const initial = localBoard ?? (defaultTemplate ? applyTemplate(defaultTemplate) : createEmptyBoard());
       setBoard(initial);
       saveBoardLocal(initial).then(refreshBoardList);
-      if (isAuthenticated) refreshShares(initial.id);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setBoard]);
+  }, [setBoard, defaultTemplate]);
+
+  useEffect(() => {
+    if (!board || !isAuthenticated) {
+      setActiveShares([]);
+      return;
+    }
+    void refreshShares(board.id);
+  }, [board?.id, isAuthenticated, refreshShares]);
 
   useEffect(() => {
     if (!board) return;
@@ -174,6 +228,40 @@ function EditorApp() {
     }, 350);
     return () => window.clearTimeout(timeout);
   }, [board, saveState, setSaveState]);
+
+  // Reconciliación local↔nube al iniciar sesión (o al recuperar la sesión).
+  // Sube los tableros locales, baja los que solo están en la nube y resuelve
+  // coincidencias por updatedAt. El modo local (anónimo) no dispara nada.
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setCloudSync("idle");
+      return;
+    }
+    let cancelled = false;
+    setCloudSync("syncing");
+    reconcileBoards()
+      .then((outcome) => {
+        if (cancelled) return;
+        setCloudSync(outcome.conflicts > 0 ? "conflict" : "synced");
+        void refreshBoardList();
+      })
+      .catch(() => { if (!cancelled) setCloudSync("offline"); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated]);
+
+  // Sube el tablero activo a la nube tras dejar de editar (debounce 2.5s),
+  // solo con sesión. Si no hay red, queda en "solo local" sin interrumpir.
+  useEffect(() => {
+    if (!board || !isAuthenticated) return;
+    const snapshot = board;
+    const timeout = window.setTimeout(async () => {
+      setCloudSync("syncing");
+      const result = await pushBoard(snapshot);
+      setCloudSync(result === "saved" ? "synced" : result === "conflict" ? "conflict" : "offline");
+    }, 2500);
+    return () => window.clearTimeout(timeout);
+  }, [board, isAuthenticated]);
 
   useEffect(() => {
     const persistCurrentBoard = () => {
@@ -198,6 +286,7 @@ function EditorApp() {
     if (!next) return;
     setBoard(next);
     setShareToken(null);
+    setActiveActivity(null);
     await rememberLastBoard(id);
     if (isAuthenticated) await refreshShares(id);
     void trackEvent({ type: "board_opened" });
@@ -216,19 +305,55 @@ function EditorApp() {
     await saveBoardLocal(copy);
     setBoard(copy);
     setShareToken(null);
+    setActiveActivity(null);
     await refreshBoardList();
     setLibraryOpen(false);
   }
 
   // ── Crear board desde plantilla ────────────────────────────────────────────
   async function createFromTemplate(template: BoardTemplate) {
-    const next = applyTemplate(template);
+    const profile = getClassroomProfileByTemplate(template.id);
+    const next = { ...applyTemplate(template), theme: profile?.theme ?? "edumind" };
+    if (profile) setActiveProfileId(profile.id);
     await saveBoardLocal(next);
     setBoard(next);
     setShareToken(null);
+    setActiveActivity(null);
     await refreshBoardList();
     setLibraryOpen(false);
     void trackEvent({ type: "template_used", templateId: template.id });
+  }
+
+  function selectClassroomProfile(profile: ClassroomProfile) {
+    setActiveProfileId(profile.id);
+    setTheme(profile.theme);
+  }
+
+  async function createFromProfile(profile: ClassroomProfile) {
+    const template = BOARD_TEMPLATES.find((candidate) => candidate.id === profile.templateId);
+    setActiveProfileId(profile.id);
+    if (!template) {
+      toast("No he encontrado la plantilla asociada a este perfil.", "error");
+      return;
+    }
+    await createFromTemplate(template);
+  }
+
+  async function createFromActivity(activityBlueprint: ActivityBlueprint) {
+    const activity = createActivity(activityBlueprint, { includeBoard: true });
+    const next = activity.board ?? createEmptyBoard();
+    const profile = getClassroomProfile(activity.profileId);
+    next.title = activity.title;
+    next.theme = profile?.theme ?? next.theme;
+    if (profile) setActiveProfileId(profile.id);
+    await saveBoardLocal(next);
+    setBoard(next);
+    setShareToken(null);
+    setActiveActivity(activity);
+    await refreshBoardList();
+    setLibraryOpen(false);
+    setResourcePickerOpen(false);
+    void trackEvent({ type: "template_used", templateId: activity.boardTemplateId ?? activity.id });
   }
 
   // ── Sala de clase ─────────────────────────────────────────────────────────
@@ -249,7 +374,7 @@ function EditorApp() {
       setSalaCode(data.code);
       setSalaOpen(true);
     } catch {
-      alert("Para abrir una sala necesitas iniciar sesión con tu cuenta EDUmind.");
+      toast("Para abrir una sala necesitas iniciar sesión con tu cuenta EDUmind.", "error");
     }
   }
 
@@ -388,9 +513,6 @@ show();
             { type: "board:auth", authenticated: isAuthenticated, loginUrl, user: authUser },
             { targetOrigin: event.origin }
           );
-          if (!isAuthenticated) {
-            window.location.href = loginUrl;
-          }
           break;
         }
         case "board:ready": {
@@ -442,19 +564,35 @@ show();
 
     window.addEventListener("message", handlePluginMessage);
     return () => window.removeEventListener("message", handlePluginMessage);
-  }, []);
+  }, [authUser, isAuthenticated]);
 
   // ── Atajos de teclado ─────────────────────────────────────────────────────
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    // No actuar cuando el foco está en un input, textarea o select
-    const tag = (e.target as HTMLElement)?.tagName;
-    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+    // No actuar cuando el foco está en un campo editable
+    const target = e.target as HTMLElement | null;
+    const tag = target?.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target?.isContentEditable) return;
 
     const ctrl = e.ctrlKey || e.metaKey;
 
     if (ctrl && e.key === "z") { e.preventDefault(); undo(); return; }
     if (ctrl && (e.key === "y" || (e.shiftKey && e.key === "Z"))) { e.preventDefault(); redo(); return; }
     if (ctrl && e.key === "d") { e.preventDefault(); duplicateSelected(); return; }
+    if (ctrl && e.key === "c") {
+      const copied = copySelected();
+      if (copied > 0) { e.preventDefault(); toast(copied === 1 ? "Elemento copiado" : `${copied} elementos copiados`, "success"); }
+      return;
+    }
+    if (ctrl && e.key === "x") {
+      const cutCount = cutSelected();
+      if (cutCount > 0) { e.preventDefault(); toast(cutCount === 1 ? "Elemento cortado" : `${cutCount} elementos cortados`, "success"); }
+      return;
+    }
+    if (ctrl && e.key === "v") {
+      const pasted = pasteClipboard();
+      if (pasted > 0) e.preventDefault();
+      return;
+    }
 
     if (e.key === "Delete" || e.key === "Backspace") { removeSelected(); return; }
     if (e.key === "Escape") {
@@ -475,7 +613,7 @@ show();
       const el = board.elements.find((el) => el.id === selectedId);
       if (el) updateElement(el.id, { locked: !el.locked });
     }
-  }, [board, selectedId, undo, redo, duplicateSelected, removeSelected, addElement, updateElement]);
+  }, [board, selectedId, undo, redo, duplicateSelected, copySelected, cutSelected, pasteClipboard, removeSelected, addElement, updateElement]);
 
   useEffect(() => {
     window.addEventListener("keydown", handleKeyDown);
@@ -488,19 +626,32 @@ show();
     await saveBoardLocal(next);
     setBoard(next);
     setShareToken(null);
+    setActiveActivity(null);
     await refreshBoardList();
     setLibraryOpen(false);
   }
 
   async function deleteBoard(id: string) {
-    if (!confirm("¿Eliminar este board local? Esta acción no revoca enlaces ya publicados.")) return;
+    const accepted = await confirmDialog({
+      title: "Eliminar board",
+      message: "¿Eliminar este board local? Esta acción no revoca enlaces ya publicados.",
+      confirmLabel: "Eliminar",
+      danger: true
+    });
+    if (!accepted) return;
     await deleteBoardLocal(id);
+    // Con sesión, borra también la copia en la nube (si no, la próxima
+    // reconciliación la volvería a bajar). Sin red, se reintenta al reconciliar.
+    if (isAuthenticated) {
+      void deleteRemoteBoard(id).catch(() => { /* offline: se resolverá luego */ });
+    }
     if (board?.id === id) {
       const fallback = await loadLastBoardLocal();
       const next = fallback ?? createEmptyBoard();
       await saveBoardLocal(next);
       setBoard(next);
       setShareToken(null);
+      setActiveActivity(null);
     }
     await refreshBoardList();
   }
@@ -524,32 +675,58 @@ show();
       await saveBoardLocal(imported);
       setBoard(imported);
       setShareToken(null);
+      setActiveActivity(null);
       await refreshBoardList();
     } catch (error) {
       console.error(error);
-      alert("No se pudo importar el board. Revisa que sea un JSON válido de EDUmind Board.");
+      toast("No se pudo importar el board. Revisa que sea un JSON válido de EDUmind Board.", "error");
     }
   }
 
   async function importAsset(file: File) {
     const allowed = ["application/pdf", "image/jpeg", "image/png"];
     if (!allowed.includes(file.type)) {
-      alert("Formato no soportado. Usa PDF, JPEG o PNG.");
+      toast("Formato no soportado. Usa PDF, JPEG o PNG.", "error");
       return;
     }
 
-    const maxBytes = 1.5 * 1024 * 1024;
-    if (file.size > maxBytes) {
-      alert("Archivo demasiado grande. Usa archivos de hasta 1.5 MB.");
+    // Con sesión el archivo se sube al servidor (hasta 8 MB) y el board solo
+    // guarda la URL. Sin sesión se embebe como data: (límite 1,5 MB).
+    const localMaxBytes = 1.5 * 1024 * 1024;
+    const uploadMaxBytes = 8 * 1024 * 1024;
+    if (file.size > (isAuthenticated ? uploadMaxBytes : localMaxBytes)) {
+      toast(
+        isAuthenticated
+          ? "Archivo demasiado grande. El límite es 8 MB."
+          : "Archivo demasiado grande. Sin sesión el límite es 1,5 MB; inicia sesión para subir hasta 8 MB.",
+        "error"
+      );
       return;
     }
 
-    const url = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result));
-      reader.onerror = () => reject(reader.error);
-      reader.readAsDataURL(file);
-    });
+    let url: string | null = null;
+    if (isAuthenticated) {
+      try {
+        const uploaded = await uploadAsset(file);
+        url = `${apiBaseUrl}${uploaded.url}`;
+      } catch (error) {
+        console.error(error);
+        if (file.size > localMaxBytes) {
+          toast("No se pudo subir el archivo al servidor. Inténtalo de nuevo.", "error");
+          return;
+        }
+        toast("No se pudo subir al servidor; se guarda dentro del board.", "info");
+      }
+    }
+
+    if (!url) {
+      url = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+    }
 
     useBoardStore.getState().addElementObject(
       createFileElement({
@@ -598,7 +775,13 @@ show();
   }
 
   async function onRevokeShare(token: string) {
-    if (!confirm("¿Revocar este enlace compartido?")) return;
+    const accepted = await confirmDialog({
+      title: "Revocar enlace",
+      message: "¿Revocar este enlace compartido? Quien lo tenga dejará de ver el board.",
+      confirmLabel: "Revocar",
+      danger: true
+    });
+    if (!accepted) return;
     try {
       await revokeShare(token);
       if (shareToken === token) setShareToken(null);
@@ -622,9 +805,19 @@ show();
 
   if (!board) {
     return (
-      <main className="empty-state">
-        <h1>EDUmind Board</h1>
-        <p>Preparando el espacio de trabajo…</p>
+      <main className="empty-state lm-page">
+        <div className="lm-plate-top lm-plate-top--compact" aria-hidden="true">
+          <i /><i /><i /><i /><i />
+        </div>
+        <div className="lm-wrap" style={{ paddingTop: "3rem" }}>
+          <div className="lm-plate-meta">
+            <span className="lm-fig">EDUmind · Board</span>
+            <span>Preparando</span>
+          </div>
+          <p className="lm-kicker" style={{ marginTop: "2rem" }}>Aplicación · pizarra de aula</p>
+          <h1 className="lm-display">EDUmind<br />Board</h1>
+          <p className="lm-tagline">Preparando el espacio de trabajo…</p>
+        </div>
       </main>
     );
   }
@@ -643,12 +836,17 @@ show();
 
   return (
     <div className={`app-shell theme-${board.theme}`}>
+      {/* Identidad Sistema Lámina (nivel 1): barra de mundos EDUmind */}
+      <div className="lm-plate-top lm-plate-top--compact lm-plate-fixed" aria-hidden="true">
+        <i /><i /><i /><i /><i />
+      </div>
       <header className="topbar">
         <div className="brand">
           <strong>EDUmind Board</strong>
           <span>{statusText(saveState)}</span>
         </div>
-        <button type="button" className="icon-only" title="Biblioteca" onClick={() => setLibraryOpen((open) => !open)}>
+        <button type="button" className="icon-only" title="Biblioteca" aria-label="Abrir biblioteca de boards"
+          aria-expanded={libraryOpen} onClick={() => setLibraryOpen((open) => !open)}>
           <Library size={18} />
         </button>
         <input
@@ -663,26 +861,67 @@ show();
           <option value="ocean">Ocean</option>
           <option value="forest">Forest</option>
         </select>
+        <button
+          type="button"
+          className={`icon-only${nocheOn ? " snap-active" : ""}`}
+          title={nocheOn ? "Modo noche activo — proyección en aula a oscuras" : "Activar modo noche para proyectar en aula a oscuras"}
+          aria-label="Alternar modo noche de proyección"
+          aria-pressed={nocheOn}
+          onClick={() => {
+            const next = !nocheOn;
+            applyNoche(next);
+            setNocheOn(next);
+          }}
+        >
+          {nocheOn ? <Sun size={16} /> : <Moon size={16} />}
+        </button>
         <div className="zoom-controls" aria-label="Zoom">
-          <button type="button" title="Deshacer (Ctrl+Z)" disabled={!canUndo}
+          <button type="button" title="Deshacer (Ctrl+Z)" aria-label="Deshacer" disabled={!canUndo}
             onClick={undo} className={canUndo ? "" : "disabled"}>
             ↩
           </button>
-          <button type="button" title="Rehacer (Ctrl+Y)" disabled={!canRedo}
+          <button type="button" title="Rehacer (Ctrl+Y)" aria-label="Rehacer" disabled={!canRedo}
             onClick={redo} className={canRedo ? "" : "disabled"}>
             ↪
           </button>
-          <button type="button" title="Alejar" onClick={() => setZoom(board.viewport.zoom - 0.1)}>
+          <button type="button" title="Alejar" aria-label="Alejar zoom" onClick={() => setZoom(board.viewport.zoom - 0.1)}>
             <Minus size={16} />
           </button>
           <span>{Math.round(board.viewport.zoom * 100)}%</span>
-          <button type="button" title="Acercar" onClick={() => setZoom(board.viewport.zoom + 0.1)}>
+          <button type="button" title="Acercar" aria-label="Acercar zoom" onClick={() => setZoom(board.viewport.zoom + 0.1)}>
             <ZoomIn size={16} />
           </button>
-          <button type="button" title="Recentrar vista" onClick={resetView}>
+          <button type="button" title="Recentrar vista" aria-label="Recentrar vista" onClick={resetView}>
             <RotateCcw size={16} />
           </button>
+          <button type="button" className={snapEnabled ? "snap-active" : ""}
+            title={snapEnabled ? "Imantado activado: los elementos se alinean al arrastrar" : "Imantado desactivado"}
+            aria-label="Alternar imantado de alineación" aria-pressed={snapEnabled}
+            onClick={toggleSnap}>
+            <Magnet size={16} />
+          </button>
+          <button type="button" className={marqueeMode ? "snap-active" : ""}
+            title={marqueeMode ? "Modo selección activo: arrastra para seleccionar varios widgets" : "Modo selección: arrastra un marco para elegir varios widgets"}
+            aria-label="Alternar modo selección" aria-pressed={marqueeMode}
+            onClick={toggleMarqueeMode}>
+            <BoxSelect size={16} />
+          </button>
         </div>
+
+        {/* Estado de sincronización con la nube (solo con sesión) */}
+        {isAuthenticated && cloudSync !== "idle" && (
+          <span
+            className={`cloud-sync cloud-sync-${cloudSync}`}
+            title="Sincronización de tus tableros con tu cuenta EDUmind"
+            aria-live="polite"
+          >
+            {cloudSync === "syncing" && <RefreshCw size={13} className="cloud-sync-spin" />}
+            {cloudSync === "synced" && <Cloud size={13} />}
+            {cloudSync === "offline" && <CloudOff size={13} />}
+            {cloudSync === "conflict" && <CloudOff size={13} />}
+            <span className="cloud-sync-label">{cloudSyncText(cloudSync)}</span>
+          </span>
+        )}
 
         {/* Botón de auth: usuario logueado o enlace de login */}
         {authState.status !== "checking" && (
@@ -710,6 +949,18 @@ show();
           <Save size={18} />
           Publicar
         </button>
+        {isAuthenticated && (
+          <button
+            type="button"
+            className="icon-only"
+            title="Historial de versiones publicadas"
+            aria-label="Historial de versiones publicadas"
+            aria-expanded={versionsOpen}
+            onClick={() => setVersionsOpen((open) => !open)}
+          >
+            <History size={17} />
+          </button>
+        )}
         {/* Botón de grabación de sesión */}
         <button
           type="button"
@@ -747,11 +998,15 @@ show();
           board={board}
           projectorToken={activeShares[0]?.token ?? shareToken}
           onClose={() => {
-            if (confirm("¿Cerrar la sala? Los alumnos perderán la conexión.")) {
-              cerrarSala();
-            } else {
-              setSalaOpen(false);
-            }
+            void confirmDialog({
+              title: "Cerrar sala",
+              message: "¿Cerrar la sala? Los alumnos perderán la conexión.",
+              confirmLabel: "Cerrar sala",
+              danger: true
+            }).then((accepted) => {
+              if (accepted) cerrarSala();
+              else setSalaOpen(false);
+            });
           }}
         />
       )}
@@ -767,6 +1022,7 @@ show();
           onExport={exportBoard}
           onImport={() => fileInputRef.current?.click()}
           onTemplate={createFromTemplate}
+          onActivity={createFromActivity}
         />
       )}
 
@@ -794,6 +1050,10 @@ show();
       />
 
       <Toolbar
+        activeProfile={activeProfile}
+        onSelectProfile={selectClassroomProfile}
+        onCreateFromProfile={createFromProfile}
+        onCreateActivity={createFromActivity}
         onPresent={() => setPresentation(true)}
         onImportAsset={() => assetInputRef.current?.click()}
         onOpenResources={() => {
@@ -815,6 +1075,24 @@ show();
             setResourcePickerOpen(false);
             void trackEvent({ type: "widget_added", widgetType: "iframe" });
           }}
+        />
+      )}
+
+      {versionsOpen && (
+        <VersionHistory
+          boardId={board.id}
+          onClose={() => setVersionsOpen(false)}
+          onRestore={(restored) => {
+            setBoard(restored);
+            void saveBoardLocal(restored).then(refreshBoardList);
+          }}
+        />
+      )}
+
+      {activeActivity && (
+        <ActivityGuide
+          activity={activeActivity}
+          onClose={() => setActiveActivity(null)}
         />
       )}
 
@@ -857,14 +1135,23 @@ show();
 export function App() {
   const path = window.location.pathname;
 
-  const proyectorMatch = path.match(/^\/proyector\/([^/]+)$/);
-  if (proyectorMatch) return <ProjectorView token={proyectorMatch[1]} />;
+  const view = (() => {
+    const proyectorMatch = path.match(/^\/proyector\/([^/]+)$/);
+    if (proyectorMatch) return <ProjectorView token={proyectorMatch[1]} />;
 
-  const aulaMatch = path.match(/^\/aula\/([^/]+)$/);
-  if (aulaMatch) return <AulaView code={aulaMatch[1]} />;
+    const aulaMatch = path.match(/^\/aula\/([^/]+)$/);
+    if (aulaMatch) return <AulaView code={aulaMatch[1]} />;
 
-  const shareMatch = path.match(/^\/share\/([^/]+)$/);
-  if (shareMatch) return <ShareView token={shareMatch[1]} />;
+    const shareMatch = path.match(/^\/share\/([^/]+)$/);
+    if (shareMatch) return <ShareView token={shareMatch[1]} />;
 
-  return <EditorApp />;
+    return <EditorApp />;
+  })();
+
+  return (
+    <>
+      {view}
+      <FeedbackHost />
+    </>
+  );
 }

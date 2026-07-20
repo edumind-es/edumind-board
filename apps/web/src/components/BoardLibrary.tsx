@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { Copy, FileDown, FileUp, Plus, Search, Trash2 } from "lucide-react";
 import type { BoardSummary } from "../lib/localDb";
+import { ACTIVITY_BLUEPRINTS, type ActivityBlueprint } from "../activities/catalog";
 import { BOARD_TEMPLATES, type BoardTemplate } from "../lib/templates";
+import { CLASSROOM_PROFILES } from "../profiles/profiles";
 
 type BoardLibraryProps = {
   boards: BoardSummary[];
@@ -13,9 +15,10 @@ type BoardLibraryProps = {
   onExport: () => void;
   onImport: () => void;
   onTemplate: (template: BoardTemplate) => void;
+  onActivity: (activity: ActivityBlueprint) => void;
 };
 
-type Tab = "boards" | "templates";
+type Tab = "boards" | "templates" | "activities";
 
 const CATEGORIES: Record<BoardTemplate["category"], string> = {
   aula: "Aula",
@@ -44,7 +47,8 @@ export function BoardLibrary({
   onDelete,
   onExport,
   onImport,
-  onTemplate
+  onTemplate,
+  onActivity
 }: BoardLibraryProps) {
   const [tab, setTab] = useState<Tab>("boards");
   const [search, setSearch] = useState("");
@@ -57,6 +61,14 @@ export function BoardLibrary({
   const filteredTemplates = BOARD_TEMPLATES.filter(
     (t) => categoryFilter === "all" || t.category === categoryFilter
   );
+  const profileTemplates = CLASSROOM_PROFILES
+    .map((profile) => ({
+      profile,
+      template: BOARD_TEMPLATES.find((template) => template.id === profile.templateId)
+    }))
+    .filter((item): item is { profile: (typeof CLASSROOM_PROFILES)[number]; template: BoardTemplate } =>
+      Boolean(item.template)
+    );
 
   return (
     <aside className="board-library">
@@ -75,6 +87,13 @@ export function BoardLibrary({
           onClick={() => setTab("templates")}
         >
           Plantillas
+        </button>
+        <button
+          type="button"
+          className={tab === "activities" ? "tab-active" : ""}
+          onClick={() => setTab("activities")}
+        >
+          Actividades
         </button>
       </div>
 
@@ -152,6 +171,15 @@ export function BoardLibrary({
 
       {tab === "templates" && (
         <>
+          <div className="profile-strip" aria-label="Perfiles rápidos de aula">
+            {profileTemplates.map(({ profile, template }) => (
+              <button key={profile.id} type="button" onClick={() => onTemplate(template)} title={profile.description}>
+                <span>{profile.emoji}</span>
+                <strong>{profile.shortName}</strong>
+              </button>
+            ))}
+          </div>
+
           {/* Filtro por categoría */}
           <div className="template-filters">
             <button
@@ -192,6 +220,54 @@ export function BoardLibrary({
           </div>
         </>
       )}
+
+      {tab === "activities" && (
+        <>
+          <div className="activity-library-intro">
+            <strong>Actividades guiadas</strong>
+            <small>Crean un board con materiales y una guía paso a paso.</small>
+          </div>
+          <div className="template-list">
+            {ACTIVITY_BLUEPRINTS.map((activity) => (
+              <button
+                key={activity.id}
+                type="button"
+                className="template-card activity-card"
+                onClick={() => onActivity(activity)}
+                title={activity.objective}
+              >
+                <span className="template-emoji">▣</span>
+                <span className="template-info">
+                  <strong>{activity.title}</strong>
+                  <small>{activity.objective}</small>
+                  <span className="activity-card-meta">
+                    {activity.estimatedTimeMinutes} min · {activity.steps.length} pasos · {activity.profileId}
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      <footer className="library-license" aria-label="Licencia y autoría">
+        <small>
+          © {new Date().getFullYear()} EDUmind® por Luis Vilela Acuña
+          <br />
+          Software libre con licencia{" "}
+          <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener noreferrer">
+            AGPL-3.0-or-later
+          </a>{" "}
+          /{" "}
+          <a href="https://eupl.eu/1.2/es/" target="_blank" rel="noopener noreferrer">
+            EUPL-1.2
+          </a>{" "}
+          ·{" "}
+          <a href="https://github.com/edumind-es/edumind-board" target="_blank" rel="noopener noreferrer">
+            Código fuente en GitHub
+          </a>
+        </small>
+      </footer>
     </aside>
   );
 }
