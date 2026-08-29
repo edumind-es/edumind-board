@@ -1,0 +1,74 @@
+# Empaquetado de release de EDUmind Board.
+#
+# SOLO se ejecuta manualmente (workflow_dispatch). NO despliega a ningún
+# servidor: por política del proyecto el deploy es manual y con backup/rollback
+# (ver docs/ARCHITECTURE.md §11). Este workflow deja los artefactos listos para
+# descargar y desplegar a mano, o para que un paso de deploy propio los consuma.
+name: Release (empaquetado manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      etiqueta:
+        description: "Etiqueta descriptiva de la release (opcional)"
+        required: false
+        default: ""
+
+jobs:
+  build:
+    name: Verificar y empaquetar
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Build del paquete compartido
+        run: npm --workspace @edumind-board/shared run build
+
+      # Puerta de calidad: no se empaqueta nada que no pase la verificación
+      - name: Verificación completa
+        run: |
+          npm run typecheck
+          npm --workspace @edumind-board/web run check:activities
+          npm --workspace @edumind-board/web run check:base10
+          npm --workspace @edumind-board/web run check:geometry
+          npm --workspace @edumind-board/web run check:space3d
+          npm run build
+          npm run check:contracts
+          npm run test
+          npm run smoke:web
+
+      - name: Empaquetar artefactos (web + API + shared)
+        run: |
+          mkdir -p release
+          tar -czf release/edumind-board-web.tar.gz -C apps/web/dist .
+          tar -czf release/edumind-board-api.tar.gz -C apps/api dist package.json
+          tar -czf release/edumind-board-shared.tar.gz -C packages/shared dist package.json
+
+      - name: Subir artefactos
+        uses: actions/upload-artifact@v4
+        with:
+          name: edumind-board-release-${{ github.sha }}
+          path: release/
+          retention-days: 14
+
+  # ── Deploy automático (DESACTIVADO a propósito) ────────────────────────────
+  # El despliegue a edumind-mini es manual por política. Si algún día se quiere
+  # automatizar, añadir aquí un job `deploy` con:
+  #   - needs: build
+  #   - environment: production   (con revisión manual requerida)
+  #   - secrets: SSH_HOST, SSH_USER, SSH_KEY, SSH_PORT (2122)
+  #   - pasos: descargar artefacto, backup del despliegue actual, rsync/scp a
+  #     /var/www/edumind_board, migraciones, restart del servicio API,
+  #     smoke HTTP y verificación de la PWA (ver docs/ARCHITECTURE.md §11).

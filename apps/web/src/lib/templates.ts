@@ -28,7 +28,12 @@ function connector(x: number, y: number, w = 260, h = 80, label = ""): Omit<Boar
   return {
     ...base(x, y, w, h),
     type: "connector",
-    data: { label, color: "#1a5fa8", strokeWidth: 4, style: "straight", arrowStart: false, arrowEnd: true }
+    data: {
+      label, color: "#1a5fa8", strokeWidth: 4, style: "straight", arrowStart: false, arrowEnd: true,
+      // Extremos por defecto: flecha horizontal, como era antes de que los
+      // conectores pudieran ir en cualquier dirección.
+      desde: { x: 0, y: 0.5 }, hasta: { x: 1, y: 0.5 }
+    }
   };
 }
 function semaphore(label: string, x: number, y: number): Omit<BoardElement, "id"> {

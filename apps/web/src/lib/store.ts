@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { BoardDocument, BoardElement, BoardInkObject, ThemeName } from "@edumind-board/shared";
-import { createElement } from "./boardFactory";
+import { createConnectorAnclado, createElement } from "./boardFactory";
+import { marcoEntreCajas, reanclarConectores } from "./conectores";
 import { newId } from "./ids";
 
 type SaveState = "local" | "dirty" | "publishing" | "published" | "error";
@@ -70,6 +71,7 @@ type BoardState = {
   updateBoard: (patch: Partial<BoardDocument>) => void;
   addElement: (type: BoardElement["type"]) => void;
   addElementObject: (element: BoardElement) => void;
+  upsertMusica: (element: BoardElement) => void;
   addInkObject: (object: BoardInkObject) => void;
   setInkObjects: (objects: BoardInkObject[]) => void;
   setSelectedInkIndex: (index: number | null) => void;
@@ -84,6 +86,8 @@ type BoardState = {
   duplicateSelected: () => void;
   /** Mueve en bloque los elementos indicados (un único paso de historial). */
   moveElementsBy: (ids: string[], dx: number, dy: number) => void;
+  /** Conexión rápida: crea una flecha anclada entre dos elementos. */
+  conectarElementos: (origenId: string, destinoId: string) => void;
   copySelected: () => number;
   cutSelected: () => number;
   pasteClipboard: () => number;
@@ -204,6 +208,44 @@ export const useBoardStore = create<BoardState>((set, get) => ({
       };
     }),
 
+  // La musica no se acumula: cada vez que se elige un modo se REEMPLAZA el
+  // reproductor que ya hubiera, conservando donde estaba y su tamano. Antes
+  // cada clic en «Musica» dejaba otro widget encima y el tablero se llenaba.
+  upsertMusica: (element) =>
+    set((state) => {
+      if (!state.board) return state;
+      const esMusica = (e: BoardElement) =>
+        e.type === "musica" ||
+        (e.type === "iframe" && e.data.title.startsWith("Música · "));
+      const anterior = state.board.elements.find(esMusica);
+
+      const elements = anterior
+        ? state.board.elements.map((e) =>
+            e === anterior
+              ? ({
+                  ...element,
+                  // Se queda donde el docente lo habia puesto.
+                  id: anterior.id,
+                  x: anterior.x,
+                  y: anterior.y,
+                  width: anterior.width,
+                  height: anterior.height,
+                  zIndex: anterior.zIndex
+                } as BoardElement)
+              : e
+          )
+        : [...state.board.elements, element];
+
+      const vivo = anterior ? anterior.id : element.id;
+      return {
+        ...pushHistory(state._history, state._historyIndex, elements, state.board.ink ?? []),
+        board: touch({ ...state.board, elements }),
+        selectedId: vivo,
+        selectedIds: [vivo],
+        saveState: "dirty"
+      };
+    }),
+
   addInkObject: (object) =>
     set((state) => {
       if (!state.board) return state;
@@ -307,9 +349,11 @@ export const useBoardStore = create<BoardState>((set, get) => ({
   updateElement: (id, patch) =>
     set((state) => {
       if (!state.board) return state;
-      const elements = state.board.elements.map((element) =>
+      const movidos = state.board.elements.map((element) =>
         element.id === id ? ({ ...element, ...patch } as BoardElement) : element
       );
+      // Las flechas ancladas a este elemento se recolocan solas.
+      const elements = reanclarConectores(movidos, [id]);
       return {
         ...pushHistory(state._history, state._historyIndex, elements, state.board.ink ?? []),
         board: touch({ ...state.board, elements }),
@@ -353,12 +397,44 @@ export const useBoardStore = create<BoardState>((set, get) => ({
     set((state) => {
       if (!state.board || ids.length === 0 || (dx === 0 && dy === 0)) return state;
       const moving = new Set(ids);
-      const elements = state.board.elements.map((element) =>
+      const movidos = state.board.elements.map((element) =>
         moving.has(element.id) ? ({ ...element, x: element.x + dx, y: element.y + dy } as BoardElement) : element
       );
+      const elements = reanclarConectores(movidos, moving);
       return {
         ...pushHistory(state._history, state._historyIndex, elements, state.board.ink ?? []),
         board: touch({ ...state.board, elements }),
+        saveState: "dirty"
+      };
+    }),
+
+  // Conexión rápida entre dos elementos: la flecha nace ya colocada y anclada.
+  // Antes había que añadir el widget «Flecha» y encajarlo a mano entre las dos
+  // cajas, que es justo lo que hacía inviable montar un diagrama en clase.
+  conectarElementos: (origenId, destinoId) =>
+    set((state) => {
+      if (!state.board || origenId === destinoId) return state;
+      const origen = state.board.elements.find((element) => element.id === origenId);
+      const destino = state.board.elements.find((element) => element.id === destinoId);
+      if (!origen || !destino) return state;
+      // Una flecha no puede ser extremo de otra: el reanclado entraría en bucle.
+      if (origen.type === "connector" || destino.type === "connector") return state;
+      const yaExiste = state.board.elements.some(
+        (element) =>
+          element.type === "connector" &&
+          element.data.anclaDesde === origenId &&
+          element.data.anclaHasta === destinoId
+      );
+      if (yaExiste) return state;
+
+      const zIndex = Math.max(0, ...state.board.elements.map((element) => element.zIndex)) + 1;
+      const conector = createConnectorAnclado(marcoEntreCajas(origen, destino), origenId, destinoId, zIndex);
+      const elements = [...state.board.elements, conector];
+      return {
+        ...pushHistory(state._history, state._historyIndex, elements, state.board.ink ?? []),
+        board: touch({ ...state.board, elements }),
+        selectedId: conector.id,
+        selectedIds: [conector.id],
         saveState: "dirty"
       };
     }),

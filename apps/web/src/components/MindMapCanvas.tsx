@@ -36,6 +36,11 @@ export default function MindMapCanvas({ element, liveControls, persist }: Props)
   const [editingEdgeId, setEditingEdgeId] = useState<string | null>(null);
   const [linkSource, setLinkSource] = useState<string | null>(null);
   const [linkMode, setLinkMode] = useState(false);
+  // Tirón de enlace: se arrastra desde el punto del nodo hasta otro nodo. El
+  // modo «Enlazar» sigue existiendo (dos toques) porque en una pizarra táctil
+  // grande el arrastre largo no siempre sale a la primera.
+  const [linkDrag, setLinkDrag] = useState<{ from: string; punto: Point } | null>(null);
+  const [linkTarget, setLinkTarget] = useState<string | null>(null);
 
   useEffect(() => { setNodes(element.data.nodes); }, [element.data.nodes]);
   useEffect(() => { setEdges(element.data.edges); }, [element.data.edges]);
@@ -114,6 +119,65 @@ export default function MindMapCanvas({ element, liveControls, persist }: Props)
     setLinkSource(null);
   }
 
+  /** Convierte coordenadas de pantalla a coordenadas lógicas del widget. */
+  function aLocal(clientX: number, clientY: number): Point {
+    const caja = frameRef.current?.getBoundingClientRect();
+    return {
+      x: (clientX - (caja?.left ?? 0)) / scale,
+      y: (clientY - (caja?.top ?? 0)) / scale
+    };
+  }
+
+  /** Nodo que hay bajo el puntero, leyendo el DOM (no hace falta medir cajas). */
+  function nodoBajoPuntero(clientX: number, clientY: number): string | null {
+    const bajo = document.elementFromPoint(clientX, clientY);
+    const nodo = bajo?.closest("[data-mindmap-node]");
+    return nodo?.getAttribute("data-mindmap-node") ?? null;
+  }
+
+  function onLinkPointerDown(e: React.PointerEvent, nodeId: string) {
+    e.stopPropagation();
+    e.preventDefault();
+    (e.currentTarget as Element).setPointerCapture(e.pointerId);
+    setLinkDrag({ from: nodeId, punto: aLocal(e.clientX, e.clientY) });
+  }
+
+  function onLinkPointerMove(e: React.PointerEvent) {
+    if (!linkDrag) return;
+    setLinkDrag({ from: linkDrag.from, punto: aLocal(e.clientX, e.clientY) });
+    const destino = nodoBajoPuntero(e.clientX, e.clientY);
+    setLinkTarget(destino && destino !== linkDrag.from ? destino : null);
+  }
+
+  function onLinkPointerUp(e: React.PointerEvent) {
+    if (!linkDrag) return;
+    const destino = nodoBajoPuntero(e.clientX, e.clientY);
+    const origen = linkDrag.from;
+    const suelto = linkDrag.punto;
+    setLinkDrag(null);
+    setLinkTarget(null);
+
+    if (destino && destino !== origen) {
+      const exists = edges.some((edge) => edge.from === origen && edge.to === destino);
+      if (!exists) {
+        const edge: MindmapEdge = { id: newId(), from: origen, to: destino, label: "" };
+        commit(nodes, [...edges, edge]);
+        if (variant === "concept") setEditingEdgeId(edge.id);
+      }
+      return;
+    }
+    // Soltar en hueco crea la idea ahí mismo y ya enlazada: es el gesto que
+    // hace que un mapa crezca sin volver a la barra de herramientas.
+    const nuevo: MindmapNode = {
+      id: newId(), text: "",
+      x: Math.round(suelto.x), y: Math.round(suelto.y),
+      color: branchColor((nodeDepths(nodes, edges).get(origen) ?? 0) + 1, accent),
+      shape: "rounded"
+    };
+    commit([...nodes, nuevo], [...edges, { id: newId(), from: origen, to: nuevo.id, label: "" }]);
+    setEditingId(nuevo.id);
+  }
+
   // ── Alta / baja de nodos ──────────────────────────────────────────────────
   function addNode() {
     const node: MindmapNode = {
@@ -164,7 +228,7 @@ export default function MindMapCanvas({ element, liveControls, persist }: Props)
 
   return (
     <div ref={frameRef} className="mindmap-frame" style={{ background: element.data.background }}>
-      <div className="mindmap-inner" style={{ width: element.width, height: element.height, transform: `scale(${scale})` }}>
+      <div className={`mindmap-inner ${linkDrag ? "is-linking" : ""}`} style={{ width: element.width, height: element.height, transform: `scale(${scale})` }}>
         <svg className="mindmap-edges" width={element.width} height={element.height}>
           <defs>
             <marker id={`mm-arrow-${element.id}`} markerWidth="10" markerHeight="10" refX="7" refY="3"
@@ -184,6 +248,16 @@ export default function MindMapCanvas({ element, liveControls, persist }: Props)
                 markerEnd={`url(#mm-arrow-${element.id})`} />
             );
           })}
+          {/* Trazo del tirón de enlace en curso */}
+          {linkDrag && (() => {
+            const a = center(linkDrag.from);
+            if (!a) return null;
+            const b = linkTarget ? center(linkTarget) ?? linkDrag.punto : linkDrag.punto;
+            return (
+              <path d={edgePath(a, b, element.data.edgeStyle)} fill="none"
+                stroke="#c45d3e" strokeWidth={2.5} strokeDasharray="8 6" />
+            );
+          })()}
         </svg>
 
         {/* Etiquetas de relación (mapa conceptual) */}
@@ -217,7 +291,8 @@ export default function MindMapCanvas({ element, liveControls, persist }: Props)
           const isLinkSource = linkSource === node.id;
           return (
             <div key={node.id}
-              className={`mindmap-node shape-${node.shape} ${isLinkSource ? "is-link-source" : ""} ${linkMode ? "is-linkable" : ""}`}
+              data-mindmap-node={node.id}
+              className={`mindmap-node shape-${node.shape} ${isLinkSource ? "is-link-source" : ""} ${linkMode ? "is-linkable" : ""} ${linkTarget === node.id ? "is-link-target" : ""}`}
               style={{ left: node.x, top: node.y, borderColor: node.color, boxShadow: `0 6px 18px ${node.color}22` }}
               onPointerDown={(e) => onNodePointerDown(e, node)}
               onPointerMove={onNodePointerMove}
@@ -231,6 +306,13 @@ export default function MindMapCanvas({ element, liveControls, persist }: Props)
                   onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); (e.target as HTMLTextAreaElement).blur(); } }} />
               ) : (
                 <span className="mindmap-node-text">{node.text || "…"}</span>
+              )}
+              {editable && !linkMode && !isEditing && (
+                <span className="mindmap-node-link" title="Arrastra hasta otra idea para enlazarlas"
+                  onPointerDown={(e) => onLinkPointerDown(e, node.id)}
+                  onPointerMove={onLinkPointerMove}
+                  onPointerUp={onLinkPointerUp}
+                  onPointerCancel={() => { setLinkDrag(null); setLinkTarget(null); }} />
               )}
               {editable && !linkMode && !isEditing && (
                 <span className="mindmap-node-actions">

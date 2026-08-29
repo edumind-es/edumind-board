@@ -1,0 +1,353 @@
+{
+  "version": 2,
+  "tablas": {
+    "arasaac_search_cache": {
+      "columnas": {
+        "query": {
+          "tipo": "TEXT",
+          "obligatoria": false,
+          "pordefecto": null,
+          "clave": true
+        },
+        "response_json": {
+          "tipo": "TEXT",
+          "obligatoria": true,
+          "pordefecto": null,
+          "clave": false
+        },
+        "fetched_at": {
+          "tipo": "TEXT",
+          "obligatoria": true,
+          "pordefecto": null,
+          "clave": false
+        }
+      },
+      "indices": []
+    },
+    "board_versions": {
+      "columnas": {
+        "id": {
+          "tipo": "TEXT",
+          "obligatoria": false,
+          "pordefecto": null,
+          "clave": true
+        },
+        "board_id": {
+          "tipo": "TEXT",
+          "obligatoria": true,
+          "pordefecto": null,
+          "clave": false
+        },
+        "version_number": {
+          "tipo": "INTEGER",
+          "obligatoria": true,
+          "pordefecto": null,
+          "clave": false
+        },
+        "snapshot_json": {
+          "tipo": "TEXT",
+          "obligatoria": true,
+          "pordefecto": null,
+          "clave": false
+        },
+        "created_at": {
+          "tipo": "TEXT",
+          "obligatoria": true,
+          "pordefecto": null,
+          "clave": false
+        }
+      },
+      "indices": []
+    },
+    "boards": {
+      "columnas": {
+        "id": {
+          "tipo": "TEXT",
+          "obligatoria": false,
+          "pordefecto": null,
+          "clave": true
+        },
+        "owner_id": {
+          "tipo": "TEXT",
+          "obligatoria": true,
+          "pordefecto": null,
+          "clave": false
+        },
+        "title": {
+          "tipo": "TEXT",
+          "obligatoria": true,
+          "pordefecto": null,
+          "clave": false
+        },
+        "draft_json": {
+          "tipo": "TEXT",
+          "obligatoria": true,
+          "pordefecto": null,
+          "clave": false
+        },
+        "created_at": {
+          "tipo": "TEXT",
+          "obligatoria": true,
+          "pordefecto": null,
+          "clave": false
+        },
+        "updated_at": {
+          "tipo": "TEXT",
+          "obligatoria": true,
+          "pordefecto": null,
+          "clave": false
+        },
+        "published_version_id": {
+          "tipo": "TEXT",
+          "obligatoria": false,
+          "pordefecto": null,
+          "clave": false
+        }
+      },
+      "indices": [
+        "idx_boards_owner"
+      ]
+    },
+    "classroom_events": {
+      "columnas": {
+        "id": {
+          "tipo": "INTEGER",
+          "obligatoria": false,
+          "pordefecto": null,
+          "clave": true
+        },
+        "session_code": {
+          "tipo": "TEXT",
+          "obligatoria": true,
+          "pordefecto": null,
+          "clave": false
+        },
+        "audience": {
+          "tipo": "TEXT",
+          "obligatoria": true,
+          "pordefecto": null,
+          "clave": false
+        },
+        "event_json": {
+          "tipo": "TEXT",
+          "obligatoria": true,
+          "pordefecto": null,
+          "clave": false
+        },
+        "created_at": {
+          "tipo": "TEXT",
+          "obligatoria": true,
+          "pordefecto": null,
+          "clave": false
+        }
+      },
+      "indices": [
+        "idx_classroom_events_created",
+        "idx_classroom_events_stream"
+      ]
+    },
+    "classroom_responses": {
+      "columnas": {
+        "id": {
+          "tipo": "TEXT",
+          "obligatoria": false,
+          "pordefecto": null,
+          "clave": true
+        },
+        "session_code": {
+          "tipo": "TEXT",
+          "obligatoria": true,
+          "pordefecto": null,
+          "clave": false
+        },
+        "type": {
+          "tipo": "TEXT",
+          "obligatoria": true,
+          "pordefecto": null,
+          "clave": false
+        },
+        "payload": {
+          "tipo": "TEXT",
+          "obligatoria": true,
+          "pordefecto": null,
+          "clave": false
+        },
+        "student_label": {
+          "tipo": "TEXT",
+          "obligatoria": false,
+          "pordefecto": null,
+          "clave": false
+        },
+        "created_at": {
+          "tipo": "TEXT",
+          "obligatoria": true,
+          "pordefecto": null,
+          "clave": false
+        }
+      },
+      "indices": [
+        "idx_classroom_responses_code"
+      ]
+    },
+    "classroom_sessions": {
+      "columnas": {
+        "code": {
+          "tipo": "TEXT",
+          "obligatoria": false,
+          "pordefecto": null,
+          "clave": true
+        },
+        "teacher_id": {
+          "tipo": "TEXT",
+          "obligatoria": true,
+          "pordefecto": null,
+          "clave": false
+        },
+        "board_json": {
+          "tipo": "TEXT",
+          "obligatoria": false,
+          "pordefecto": null,
+          "clave": false
+        },
+        "active": {
+          "tipo": "INTEGER",
+          "obligatoria": true,
+          "pordefecto": "1",
+          "clave": false
+        },
+        "created_at": {
+          "tipo": "TEXT",
+          "obligatoria": true,
+          "pordefecto": null,
+          "clave": false
+        },
+        "updated_at": {
+          "tipo": "TEXT",
+          "obligatoria": true,
+          "pordefecto": null,
+          "clave": false
+        }
+      },
+      "indices": [
+        "idx_classroom_sessions_teacher"
+      ]
+    },
+    "share_links": {
+      "columnas": {
+        "token": {
+          "tipo": "TEXT",
+          "obligatoria": false,
+          "pordefecto": null,
+          "clave": true
+        },
+        "board_id": {
+          "tipo": "TEXT",
+          "obligatoria": true,
+          "pordefecto": null,
+          "clave": false
+        },
+        "version_id": {
+          "tipo": "TEXT",
+          "obligatoria": false,
+          "pordefecto": null,
+          "clave": false
+        },
+        "active": {
+          "tipo": "INTEGER",
+          "obligatoria": true,
+          "pordefecto": "1",
+          "clave": false
+        },
+        "expires_at": {
+          "tipo": "TEXT",
+          "obligatoria": false,
+          "pordefecto": null,
+          "clave": false
+        },
+        "created_at": {
+          "tipo": "TEXT",
+          "obligatoria": true,
+          "pordefecto": null,
+          "clave": false
+        },
+        "revoked_at": {
+          "tipo": "TEXT",
+          "obligatoria": false,
+          "pordefecto": null,
+          "clave": false
+        }
+      },
+      "indices": [
+        "idx_share_links_board"
+      ]
+    },
+    "users": {
+      "columnas": {
+        "id": {
+          "tipo": "TEXT",
+          "obligatoria": false,
+          "pordefecto": null,
+          "clave": true
+        },
+        "oidc_subject": {
+          "tipo": "TEXT",
+          "obligatoria": true,
+          "pordefecto": null,
+          "clave": false
+        },
+        "email": {
+          "tipo": "TEXT",
+          "obligatoria": false,
+          "pordefecto": null,
+          "clave": false
+        },
+        "username": {
+          "tipo": "TEXT",
+          "obligatoria": true,
+          "pordefecto": null,
+          "clave": false
+        },
+        "role": {
+          "tipo": "TEXT",
+          "obligatoria": true,
+          "pordefecto": null,
+          "clave": false
+        },
+        "groups_json": {
+          "tipo": "TEXT",
+          "obligatoria": true,
+          "pordefecto": "'[]'",
+          "clave": false
+        },
+        "auth_provider": {
+          "tipo": "TEXT",
+          "obligatoria": true,
+          "pordefecto": "'authentik'",
+          "clave": false
+        },
+        "last_login_at": {
+          "tipo": "TEXT",
+          "obligatoria": false,
+          "pordefecto": null,
+          "clave": false
+        },
+        "created_at": {
+          "tipo": "TEXT",
+          "obligatoria": true,
+          "pordefecto": null,
+          "clave": false
+        },
+        "updated_at": {
+          "tipo": "TEXT",
+          "obligatoria": true,
+          "pordefecto": null,
+          "clave": false
+        }
+      },
+      "indices": [
+        "idx_users_email",
+        "idx_users_oidc_subject"
+      ]
+    }
+  }
+}

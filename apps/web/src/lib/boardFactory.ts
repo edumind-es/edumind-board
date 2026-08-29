@@ -1,5 +1,6 @@
 import type { BoardDocument, BoardElement } from "@edumind-board/shared";
 import { newId } from "./ids";
+import type { MarcoConector } from "./conectores";
 
 export function createEmptyBoard(): BoardDocument {
   return {
@@ -80,6 +81,12 @@ export function createElement(type: BoardElement["type"]): BoardElement {
       return {
         ...base, type, width: 520, height: 320,
         data: { url: "https://phet.colorado.edu/", title: "Recurso web", mode: "embed" }
+      };
+
+    case "musica":
+      return {
+        ...base, type, width: 380, height: 190,
+        data: { modeId: "flexible", titulo: "Música de aula" }
       };
 
     case "timer":
@@ -264,7 +271,9 @@ export function createElement(type: BoardElement["type"]): BoardElement {
           strokeWidth: 4,
           style: "straight",
           arrowStart: false,
-          arrowEnd: true
+          arrowEnd: true,
+          desde: { x: 0, y: 0.5 },
+          hasta: { x: 1, y: 0.5 }
         }
       };
 
@@ -369,6 +378,14 @@ export function createFileElement(file: {
   };
 }
 
+// Crea el reproductor de música de un modo de trabajo. La música la sirve el
+// propio servidor: ni suena a trozos de 30 s ni manda datos a terceros.
+export function createMusicaPreset(modeId: string, titulo: string): BoardElement {
+  const base = createElement("musica");
+  if (base.type !== "musica") throw new Error("createElement no devolvio un elemento de musica");
+  return { ...base, data: { ...base.data, modeId, titulo } };
+}
+
 // Crea un elemento iframe con URL y título predefinidos (presets web y música).
 export function createIframePreset(
   url: string,
@@ -428,5 +445,64 @@ export function createMates3dSolid(
       cameraPosition: [16, 14, 22],
       cameraTarget: [0, 4, 0]
     }
+  };
+}
+
+/**
+ * Conector ya colocado entre dos elementos (conexión rápida del lienzo).
+ *
+ * La geometría la calcula `lib/conectores.ts`; aquí solo se le da forma de
+ * elemento del tablero, con el anclaje puesto para que la flecha siga a sus
+ * extremos cuando se muevan.
+ */
+export function createConnectorAnclado(
+  marco: MarcoConector,
+  anclaDesde: string,
+  anclaHasta: string,
+  zIndex: number
+): BoardElement {
+  return {
+    id: newId(),
+    type: "connector",
+    x: marco.x,
+    y: marco.y,
+    width: marco.width,
+    height: marco.height,
+    rotation: 0,
+    zIndex,
+    opacity: 1,
+    locked: false,
+    data: {
+      label: "",
+      color: "#1a5fa8",
+      strokeWidth: 4,
+      style: "straight",
+      arrowStart: false,
+      arrowEnd: true,
+      desde: marco.desde,
+      hasta: marco.hasta,
+      anclaDesde,
+      anclaHasta
+    }
+  };
+}
+
+/**
+ * Widget de una app EDUmind concreta, ya elegida.
+ *
+ * `createElement("hub")` siempre daba Motion y había que cambiar la app en el
+ * inspector; desde el menú de Apps se elige directamente cuál.
+ */
+export function createHubApp(
+  appId: Extract<BoardElement, { type: "hub" }>["data"]["appId"],
+  mode: Extract<BoardElement, { type: "hub" }>["data"]["mode"] = "express"
+): BoardElement {
+  const element = createElement("hub");
+  if (element.type !== "hub") return element;
+  return {
+    ...element,
+    width: mode === "embed" ? 720 : 360,
+    height: mode === "embed" ? 520 : 240,
+    data: { appId, mode }
   };
 }

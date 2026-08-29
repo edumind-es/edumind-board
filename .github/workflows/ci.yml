@@ -1,0 +1,62 @@
+# Integración continua de EDUmind Board.
+# Ejecuta la misma batería que docs/ARCHITECTURE.md exige antes de cada release.
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+
+# Cancela ejecuciones anteriores de la misma rama para no acumular cola
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Typecheck, tests y build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          # La misma que corre en produccion. Estaba en 20 mientras el
+          # servidor iba con 22: el CI validaba un runtime que no era el real.
+          node-version: "22"
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      # El paquete compartido debe compilarse antes: API y contratos importan su dist
+      - name: Build del paquete compartido
+        run: npm --workspace @edumind-board/shared run build
+
+      - name: Typecheck (todos los workspaces)
+        run: npm run typecheck
+
+      - name: Checks de dominio (actividades, base10, geometría, 3D, dictados)
+        run: |
+          npm --workspace @edumind-board/web run check:activities
+          npm --workspace @edumind-board/web run check:base10
+          npm --workspace @edumind-board/web run check:geometry
+          npm --workspace @edumind-board/web run check:space3d
+          npm --workspace @edumind-board/web run check:dictados
+
+      - name: Build de producción
+        run: npm run build
+
+      - name: Contratos de producción
+        run: npm run check:contracts
+
+      - name: Tests del API
+        run: npm run test
+
+      - name: Smoke de la PWA (preview + assets + service worker)
+        run: npm run smoke:web

@@ -16,8 +16,10 @@
     "typecheck": "npm run typecheck --workspaces",
     "lint": "npm run lint --workspaces",
     "check:contracts": "node scripts/check-production-contracts.mjs",
-    "test": "npm --workspace @edumind-board/api run test",
-    "smoke:web": "npm --workspace @edumind-board/web run smoke"
+    "test": "npm run test --workspaces --if-present",
+    "smoke:web": "npm --workspace @edumind-board/web run smoke",
+    "check:subida": "node scripts/check-limite-subida.mjs",
+    "check:csp": "node scripts/check-csp-frame-src.mjs"
   },
   "engines": {
     "node": ">=20.0.0"

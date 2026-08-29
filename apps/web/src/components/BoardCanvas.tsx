@@ -10,7 +10,11 @@ import { useBoardStore } from "../lib/store";
 import { getHubApp } from "../lib/hubApps";
 import { renderWidget } from "../widgets/renderers";
 import { withEmbedParams } from "../widgets/components/HubWidget";
+import { X } from "lucide-react";
+import { ReproductorMusica } from "./ReproductorMusica";
 import { GlobalInkLayer, renderInkObject } from "./GlobalInkLayer";
+import { ConexionRapida } from "./ConexionRapida";
+import { ArchivoOverlay } from "./ArchivoOverlay";
 
 // Nombre de host legible para la tarjeta-lanzador (sin www.).
 function hostOf(url: string) {
@@ -687,6 +691,44 @@ export const BoardCanvas = memo(function BoardCanvas({
         )}
       </Stage>
 
+      {/* Conexión rápida: tiradores para tirar una flecha hasta otro elemento.
+          Solo con UN elemento seleccionado — con varios, los tiradores taparían
+          la selección y no hay un origen claro. */}
+      {!readonly && !presentation && selectedIds.length === 1 && (() => {
+        const seleccionado = sortedElements.find((e) => e.id === selectedId);
+        if (!seleccionado || seleccionado.locked) return null;
+        return <ConexionRapida board={board} element={seleccionado} />;
+      })()}
+
+      {/* Botón de borrar sobre el elemento seleccionado.
+          Antes había que ir al menú de la derecha para quitar un widget, lo
+          que en una pizarra táctil delante de la clase es un viaje. Se pinta
+          fuera del contenedor de overlays para que no lo tape ningún iframe. */}
+      {!readonly && !presentation && (() => {
+        const seleccionado = sortedElements.find((e) => e.id === selectedId);
+        if (!seleccionado) return null;
+        const z = board.viewport.zoom;
+        return (
+          <button
+            type="button"
+            className="borrar-elemento"
+            aria-label={`Eliminar ${seleccionado.type}`}
+            title="Eliminar (Supr)"
+            style={{
+              left: `${board.viewport.x + (seleccionado.x + seleccionado.width) * z - 14}px`,
+              top: `${board.viewport.y + seleccionado.y * z - 14}px`
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              useBoardStore.getState().removeSelected();
+            }}
+          >
+            <X size={16} aria-hidden="true" />
+          </button>
+        );
+      })()}
+
       {/* Overlays controlados imperativamente durante drag para evitar re-renders */}
       <div ref={overlayDivRef} className="iframe-overlays"
         style={{ opacity: 1, transition: "opacity 0.1s" }}>
@@ -723,6 +765,23 @@ export const BoardCanvas = memo(function BoardCanvas({
             </div>
           ))}
         {sortedElements
+          .filter((e): e is Extract<BoardElement, { type: "musica" }> => e.type === "musica")
+          .map((el) => (
+            <div key={el.id} data-overlay-id={el.id} className={overlayClassName(el.id)} style={overlayShellStyle(el)}>
+              <div className="embed-move-handle embed-move-handle-top" aria-hidden="true" />
+              <div className="embed-move-handle embed-move-handle-left" aria-hidden="true" />
+              <div className="embed-move-handle embed-move-handle-right" aria-hidden="true" />
+              <div className="embed-move-handle embed-move-handle-bottom" aria-hidden="true" />
+              <div style={overlayFrameStyle(el)}>
+                <ReproductorMusica
+                  modeId={el.data.modeId}
+                  titulo={el.data.titulo}
+                  pistaInicial={el.data.pistaId}
+                />
+              </div>
+            </div>
+          ))}
+        {sortedElements
           .filter((e): e is Extract<BoardElement, { type: "file" }> => e.type === "file")
           .filter((e) => e.data.kind === "pdf")
           .map((el) => (
@@ -731,7 +790,7 @@ export const BoardCanvas = memo(function BoardCanvas({
               <div className="embed-move-handle embed-move-handle-left" aria-hidden="true" />
               <div className="embed-move-handle embed-move-handle-right" aria-hidden="true" />
               <div className="embed-move-handle embed-move-handle-bottom" aria-hidden="true" />
-              <iframe data-board-element-id={el.id} title={el.data.name} src={el.data.url}
+              <ArchivoOverlay id={el.id} name={el.data.name} url={el.data.url}
                 style={overlayFrameStyle(el)} />
             </div>
           ))}

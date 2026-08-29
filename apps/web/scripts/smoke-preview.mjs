@@ -59,9 +59,11 @@ try {
     assert(response.ok, `${path} respondio ${response.status}`);
   }));
 
+  // Service worker generado por vite-plugin-pwa (workbox generateSW):
+  // debe precachear assets versionados y registrar el fallback de navegación.
   const sw = await fetchText("/sw.js");
-  assert(/edumind-board-v\d+/.test(sw), "sw.js no contiene version de cache");
-  assert(sw.includes("networkFirst"), "sw.js no usa estrategia network-first");
+  assert(sw.includes("workbox"), "sw.js no es el service worker generado por workbox");
+  assert(/"url":\s*"assets\//.test(sw) || sw.includes("assets/"), "sw.js no precachea assets versionados");
 
   const manifestResponse = await fetch(`${baseUrl}/manifest.webmanifest`);
   assert(manifestResponse.ok, "manifest.webmanifest no responde correctamente");

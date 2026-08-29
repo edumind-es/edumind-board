@@ -3274,3 +3274,434 @@ a:focus-visible {
   color: var(--muted);
   line-height: 1.4;
 }
+
+/* ── Reproductor de música de aula ────────────────────────────────────────
+   Audio nativo servido por nuestro servidor: suena entero y no manda datos
+   a terceros, a diferencia de los embeds de Spotify o YouTube. */
+.musica-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    height: 100%;
+    padding: 0.85rem 1rem;
+    background: #fffaf0;
+    border: 1px solid #2a7a6d;
+    border-radius: 12px;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.musica-cabecera {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: #22302f;
+}
+
+.musica-pista {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #22302f;
+    /* Los títulos largos no deben empujar la atribución fuera del marco. */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.musica-controles {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.musica-controles button {
+    display: grid;
+    place-items: center;
+    width: 2.4rem;
+    height: 2.4rem;
+    border: 1px solid #2a7a6d;
+    border-radius: 50%;
+    background: #fff;
+    color: #22302f;
+    cursor: pointer;
+}
+
+.musica-controles button:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.musica-posicion {
+    font-size: 0.85rem;
+    color: #5f6f6d;
+}
+
+/* Obligatoria por la licencia CC BY: pequeña, pero siempre visible. */
+.musica-atribucion {
+    margin: auto 0 0;
+    font-size: 0.72rem;
+    line-height: 1.3;
+    color: #5f6f6d;
+}
+
+.musica-panel-vacio {
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: #5f6f6d;
+}
+
+/* ── Borrar el elemento seleccionado sin ir al menú lateral ──────────────
+   En una pizarra táctil delante de la clase, ir al panel de la derecha para
+   quitar un widget es un viaje. Este botón va pegado a la esquina superior
+   derecha del elemento. */
+.borrar-elemento {
+    position: absolute;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid #b3453b;
+    border-radius: 50%;
+    background: #fff;
+    color: #b3453b;
+    cursor: pointer;
+    /* Por encima de los iframes de los overlays, que tienen z-index propio. */
+    z-index: 9000;
+    box-shadow: 0 2px 6px rgb(0 0 0 / 22%);
+}
+
+.borrar-elemento:hover,
+.borrar-elemento:focus-visible {
+    background: #b3453b;
+    color: #fff;
+}
+
+/* Objetivo táctil holgado sin agrandar el círculo. */
+.borrar-elemento::after {
+    content: "";
+    position: absolute;
+    inset: -8px;
+}
+
+/* ── Submenú de fuente de música ─────────────────────────────────────────
+   La de la pizarra va primera a propósito: es la única que suena entera sin
+   depender de una cuenta ajena ni mandar datos fuera del aula. */
+.music-fuentes {
+    display: flex;
+    gap: 0.3rem;
+    margin: 0.5rem 0 0.2rem;
+}
+
+.music-fuente {
+    flex: 1;
+    padding: 0.3rem 0.2rem;
+    font-size: 0.76rem;
+    border: 1px solid #cfd8d6;
+    border-radius: 8px;
+    background: #fff;
+    color: #5f6f6d;
+    cursor: pointer;
+}
+
+.music-fuente.is-active {
+    border-color: #2a7a6d;
+    background: #eaf5f2;
+    color: #22302f;
+    font-weight: 600;
+}
+
+.music-login {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin-top: 0.35rem;
+    padding: 0.3rem 0.6rem;
+    font-size: 0.78rem;
+    border: 1px solid #2a7a6d;
+    border-radius: 8px;
+    background: #fff;
+    color: #22302f;
+    cursor: pointer;
+}
+
+/* Que el docente sepa lo que implica incrustar un servicio de terceros. */
+.music-aviso {
+    margin-top: 0.35rem;
+    font-size: 0.7rem;
+    color: #8a6d3b;
+}
+
+/* ── Conexión rápida (flechas de diagrama) ──────────────────────────────────
+   Capa transparente sobre el Stage: solo los tiradores reciben el puntero, el
+   resto pasa de largo para no robarle clics al lienzo. */
+.conexion-rapida-capa {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    /* Por debajo del botón de borrar (9000) y por encima de los iframes. */
+    z-index: 8900;
+}
+
+.conexion-rapida-trazo {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+
+.conexion-rapida-tirador {
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    margin: -8px 0 0 -8px;
+    padding: 0;
+    border: 2px solid #1a5fa8;
+    border-radius: 50%;
+    background: #fff;
+    cursor: crosshair;
+    pointer-events: auto;
+    opacity: 0.75;
+    /* El navegador no debe interpretar el arrastre como scroll en la PDI. */
+    touch-action: none;
+    transition: opacity 0.12s, transform 0.12s;
+}
+
+.conexion-rapida-tirador:hover,
+.conexion-rapida-tirador:focus-visible,
+.conexion-rapida-tirador.is-activo {
+    opacity: 1;
+    transform: scale(1.25);
+}
+
+/* Objetivo táctil holgado sin agrandar el círculo (mismo truco que borrar). */
+.conexion-rapida-tirador::after {
+    content: "";
+    position: absolute;
+    inset: -12px;
+}
+
+.conexion-rapida-destino {
+    position: absolute;
+    border: 2px solid #1a5fa8;
+    border-radius: 8px;
+    background: rgb(26 95 168 / 8%);
+    pointer-events: none;
+}
+
+/* Tirador de enlace del mapa mental: se arrastra hasta otra idea (o hasta un
+   hueco, que crea la idea ya enlazada). Antes había que activar el modo
+   «Enlazar» y dar dos toques, lo que rompía el ritmo de la clase. */
+.mindmap-node-link {
+  position: absolute;
+  right: -9px;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin-top: -7px;
+  border: 2px solid #c45d3e;
+  border-radius: 50%;
+  background: #fff;
+  cursor: crosshair;
+  opacity: 0;
+  touch-action: none;
+  transition: opacity 0.12s, transform 0.12s;
+}
+
+.mindmap-node:hover .mindmap-node-link,
+.mindmap-node:focus-within .mindmap-node-link {
+  opacity: 1;
+}
+
+/* En táctil no hay hover: el tirador se ve siempre. */
+@media (hover: none) {
+  .mindmap-node-link { opacity: 0.8; }
+}
+
+.mindmap-node-link::after {
+  content: "";
+  position: absolute;
+  inset: -10px;
+}
+
+/* Durante el tirón los tiradores no deben capturar el punto: lo que importa
+   es qué nodo hay debajo. */
+.mindmap-inner.is-linking .mindmap-node-link { pointer-events: none; }
+
+.mindmap-node.is-link-target {
+  outline: 2px solid #c45d3e;
+  outline-offset: 3px;
+  background: #fff6f2;
+}
+
+/* Aviso en el hueco de un archivo local que no está en este navegador. */
+.archivo-overlay-aviso {
+    position: absolute;
+    display: grid;
+    place-items: center;
+    padding: 16px;
+    border: 1px dashed #c9c3b6;
+    border-radius: 10px;
+    background: #f7f5f0;
+    color: #687876;
+    font-size: 15px;
+    text-align: center;
+}
+
+/* ── Paneles nuevos del menú principal (Respirar, Apps, Nube) ───────────────
+   Comparten la caja de .tool-palette; aquí solo va lo propio de cada uno. */
+.breath-header,
+.apps-header,
+.nube-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.breath-sub,
+.apps-sub,
+.nube-sub {
+    margin: 0;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.breath-desc,
+.breath-note,
+.nube-note {
+    margin: 0;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.breath-estrategias {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 8px;
+}
+
+.breath-estrategia {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 9px 11px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+}
+
+.breath-estrategia strong { font-size: 14px; }
+.breath-estrategia small { color: var(--muted); font-size: 12px; line-height: 1.35; }
+.breath-estrategia.is-active { border-color: #6366f1; background: color-mix(in srgb, #6366f1 10%, transparent); }
+.breath-estrategia:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.breath-modos,
+.nube-actions,
+.breath-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.breath-modo {
+    padding: 7px 13px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: transparent;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.breath-modo.is-active { border-color: #6366f1; background: color-mix(in srgb, #6366f1 14%, transparent); }
+
+.breath-auto {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 13px;
+    color: var(--muted);
+}
+
+.breath-open,
+.nube-estado { font-size: 12px; }
+
+.breath-open {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--muted);
+}
+
+.apps-lista {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.apps-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 11px;
+    border: 1px solid var(--line);
+    border-left-width: 4px;
+    border-radius: 8px;
+}
+
+.apps-emoji {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    width: 38px;
+    height: 38px;
+    border-radius: 9px;
+    font-size: 20px;
+}
+
+.apps-texto { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.apps-texto strong { font-size: 14px; }
+.apps-texto small { color: var(--muted); font-size: 12px; line-height: 1.35; }
+.apps-botones { display: flex; gap: 6px; flex: 0 0 auto; }
+.apps-botones button { padding: 6px 11px; font-size: 12px; }
+
+.nube-campo { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.nube-campo span { color: var(--muted); font-size: 12px; }
+
+.nube-campo input {
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: var(--panel);
+    color: inherit;
+    font-size: 13px;
+}
+
+.nube-estado { margin: 0; line-height: 1.45; }
+.nube-estado.is-embed { color: #2a7a6d; }
+.nube-estado.is-launcher { color: #a2601f; }
+.nube-estado.is-error { color: #b3453b; }
+
+.nube-ejemplos { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.nube-ejemplos li { display: flex; flex-direction: column; gap: 2px; font-size: 12px; }
+.nube-ejemplos code { color: var(--muted); font-size: 11px; word-break: break-all; }
+.nube-ejemplos li.is-active strong { color: #2a7a6d; }
+
+/* Contador de rondas del panel de respiración. */
+.breath-auto input[type="number"] {
+    width: 4.2rem;
+    padding: 4px 6px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--panel);
+    color: inherit;
+    font-size: 13px;
+}

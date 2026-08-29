@@ -156,22 +156,6 @@ export async function getBoardVersion(boardId: string, versionId: string) {
   );
 }
 
-// Sube un archivo al servidor (docente autenticado). El board guarda solo la
-// URL, no el base64: las versiones publicadas dejan de duplicar el archivo.
-export async function uploadAsset(file: File) {
-  const dataUrl = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
-  const dataBase64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
-  return apiFetch<{ id: string; url: string; name: string; mimeType: string; sizeBytes: number }>(
-    "/api/uploads",
-    { method: "POST", body: JSON.stringify({ name: file.name, mimeType: file.type, dataBase64 }) }
-  );
-}
-
 export async function searchArasaac(query: string) {
   const params = new URLSearchParams();
   params.set("q", query.trim());

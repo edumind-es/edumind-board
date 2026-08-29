@@ -31,13 +31,31 @@ try {
   assert(result.status === 0, result.stderr || result.stdout || "geometry.ts no compila");
 
   const geometry = await import(pathToFileURL(path.join(outDir, "lib", "geometry.js")).href);
-  const { measureAngleFromVector, toLocalPoint } = geometry;
+  const { measureAngleFromVector, toLocalPoint, clampSides, ellipsePolygonPoints, angleVectorFromDegrees } = geometry;
 
   assert(measureAngleFromVector(120, 0).angle === 0, "angulo horizontal incorrecto");
   assert(measureAngleFromVector(120, -120).angle === 45, "angulo 45 ascendente incorrecto");
   assert(measureAngleFromVector(0, -120).angle === 90, "angulo 90 ascendente incorrecto");
   assert(measureAngleFromVector(0, 120).angle === 90, "angulo 90 descendente incorrecto");
   assert(measureAngleFromVector(120, 120).angle === 45, "angulo 45 descendente incorrecto");
+
+  // clampSides: rango y redondeo
+  assert(clampSides(2) === 3, "clampSides no aplica el minimo");
+  assert(clampSides(99) === 24, "clampSides no aplica el maximo");
+  assert(clampSides(5.4, 3, 12) === 5, "clampSides no redondea");
+
+  // ellipsePolygonPoints: nº de vértices y primer vértice arriba (a las 12)
+  const tri = ellipsePolygonPoints(0, 0, 10, 10, 3, -90);
+  assert(tri.length === 6, "el triangulo debe tener 3 vertices (6 coords)");
+  assertClose(tri[0], 0, "primer vertice x debe estar centrado");
+  assertClose(tri[1], -10, "primer vertice y debe estar arriba");
+  assert(ellipsePolygonPoints(0, 0, 5, 5, 8, -90).length === 16, "octogono debe tener 8 vertices");
+
+  // angleVectorFromDegrees inverso de measureAngleFromVector
+  for (const deg of [0, 30, 45, 90, 135, 180]) {
+    const { w, h } = angleVectorFromDegrees(deg, 150);
+    assert(measureAngleFromVector(w, h).angle === deg, `angleVectorFromDegrees no es inverso en ${deg}°`);
+  }
 
   const plain = toLocalPoint({ x: 15, y: 25 }, { x: 10, y: 20, rotation: 0 });
   assertClose(plain.x, 5, "coordenada local x sin rotacion");

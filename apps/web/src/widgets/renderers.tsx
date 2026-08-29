@@ -66,6 +66,15 @@ export function renderWidget(element: BoardElement, ctx: WidgetRenderContext) {
           <Text text={element.data.url} x={18} y={58} width={element.width - 36} fill="#5f6f6d" fontSize={15} />
         </>
       );
+    case "musica":
+      // Igual que el iframe: el reproductor real vive en el overlay HTML,
+      // esto es solo el marco que se ve y se arrastra en el canvas.
+      return (
+        <>
+          <Rect width={element.width} height={element.height} fill="#fffaf0" stroke="#2a7a6d" cornerRadius={12} />
+          <Text text={element.data.titulo} x={18} y={18} width={element.width - 36} fill="#22302f" fontSize={20} />
+        </>
+      );
     case "timer":
       return <TimerWidget element={element} liveControls={ctx.liveControls} />;
     case "semaphore":

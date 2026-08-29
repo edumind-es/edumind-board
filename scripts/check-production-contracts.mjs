@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 function assert(condition, message) {
@@ -114,22 +114,32 @@ boardDocumentSchema.parse(sampleBoard);
 assert(isAllowedEmbedUrl("https://pasos.edumind.es/?embed=1"), "EDUmind Hub apps must be embeddable");
 assert(!isAllowedEmbedUrl("https://example.invalid/"), "Unknown hosts must stay blocked for embeds");
 
-const serverSource = readFileSync(resolve("apps/api/src/server.ts"), "utf8");
-const dbSource = readFileSync(resolve("apps/api/src/db.ts"), "utf8");
+// El API está modularizado: los contratos pueden vivir en server.ts,
+// app.ts o cualquier módulo bajo src/ (routes/, auth/).
+function collectApiSources(dir) {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const absolute = join(dir, entry.name);
+    if (entry.isDirectory()) return collectApiSources(absolute);
+    return entry.isFile() && entry.name.endsWith(".ts") ? [readFileSync(absolute, "utf8")] : [];
+  });
+}
+
+const apiSource = collectApiSources(resolve("apps/api/src")).join("\n");
+// El esquema ya no vive en db.ts sino en las migraciones, y su forma
+// declarada esta en esquema.json. Comprobar el JSON es mas firme que buscar
+// texto en el fuente: no depende de como este escrito el SQL.
+const esquema = JSON.parse(readFileSync(resolve("apps/api/esquema.json"), "utf8"));
 [
   '"/api/arasaac/search"',
   '"/api/sala/:code/responses"',
   "publishClassroomEvent",
   "streamStoredClassroomEvents"
 ].forEach((needle) => {
-  assert(serverSource.includes(needle), `Missing production contract: ${needle}`);
+  assert(apiSource.includes(needle), `Missing production contract: ${needle}`);
 });
 
-[
-  "CREATE TABLE IF NOT EXISTS classroom_events",
-  "CREATE TABLE IF NOT EXISTS arasaac_search_cache"
-].forEach((needle) => {
-  assert(dbSource.includes(needle), `Missing database contract: ${needle}`);
+["classroom_events", "arasaac_search_cache"].forEach((tabla) => {
+  assert(esquema.tablas[tabla], `Missing database contract: tabla ${tabla}`);
 });
 
 const inspectorSource = readFileSync(resolve("apps/web/src/components/Inspector.tsx"), "utf8");

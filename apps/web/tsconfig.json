@@ -3,8 +3,20 @@
   "compilerOptions": {
     "composite": true,
     "jsx": "react-jsx",
-    "types": ["vite/client"]
+    "types": ["vite/client"],
+    "baseUrl": "../..",
+    // El mismo mapeo que vite.config.ts y vitest.config.ts, y por el mismo
+    // motivo: sin él `tsc` comprobaba el tipado contra el `dist` COMPILADO de
+    // shared —el esquema desplegado, no el que se está tocando—, de modo que
+    // un cambio en shared solo se comprobaba de verdad tras compilarlo.
+    //
+    // ⚠️ Aquí NO puede haber `references` a packages/shared: una referencia de
+    // proyecto gana al mapeo (TypeScript redirige a los .d.ts del proyecto
+    // referenciado) y volveríamos al dist. No hace falta: vite empaqueta desde
+    // el código fuente, y el despliegue compila shared por su cuenta.
+    "paths": { "@edumind-board/shared": ["packages/shared/src/index.ts"] }
   },
-  "include": ["src", "vite.config.ts"],
-  "references": [{ "path": "../../packages/shared" }]
+  // El código fuente de shared entra en el programa (lo pide `composite`, que
+  // exige listar todos los ficheros). Es coherente: es lo que vite empaqueta.
+  "include": ["src", "vite.config.ts", "../../packages/shared/src"]
 }

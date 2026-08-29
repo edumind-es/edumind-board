@@ -2,7 +2,9 @@ import { useState } from "react";
 import {
   BookOpen,
   ClipboardList,
+  CloudUpload,
   FilePlus2,
+  Grid2x2,
   LayoutDashboard,
   Link2,
   Maximize2,
@@ -11,21 +13,25 @@ import {
   PenLine,
   Square,
   Trash2,
+  Wind,
   Youtube
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { isAllowedEmbedUrl, shouldLaunchInNewTab } from "@edumind-board/shared";
 import { toYouTubeEmbedUrl } from "../lib/music";
 import { MusicPanel } from "./MusicPanel";
+import { AppsPanel } from "./AppsPanel";
+import { BreathPanel } from "./BreathPanel";
+import { NubePanel } from "./NubePanel";
 import { ACTIVITY_BLUEPRINTS, type ActivityBlueprint } from "../activities/catalog";
 import { useBoardStore } from "../lib/store";
-import { createIframePreset } from "../lib/boardFactory";
+import { createHubApp, createMusicaPreset, createIframePreset } from "../lib/boardFactory";
 import { CLASSROOM_PROFILES, type ClassroomProfile } from "../profiles/profiles";
 import { WIDGET_GROUPS, getWidgetDefinitions, type WidgetGroup } from "../widgets/registry";
 import { confirmDialog, toast } from "./ui/feedback";
 
 type IframePreset = { label: string; icon: LucideIcon; url: string; title: string };
-type ActivePanel = WidgetGroup | "profile" | "activities" | "music" | null;
+type ActivePanel = WidgetGroup | "profile" | "activities" | "music" | "apps" | "breath" | "nube" | null;
 
 const iframePresets: IframePreset[] = [
   { label: "Música",  icon: Music,   url: "", title: "Música" },
@@ -51,6 +57,7 @@ export function Toolbar({
 }) {
   const addElement = useBoardStore((s) => s.addElement);
   const addElementObject = useBoardStore((s) => s.addElementObject);
+  const upsertMusica = useBoardStore((s) => s.upsertMusica);
   const setSelectedId = useBoardStore((s) => s.setSelectedId);
   const inkCount = useBoardStore((s) => s.board?.ink?.length ?? 0);
   const globalInkMode = useBoardStore((s) => s.globalInkMode);
@@ -68,7 +75,7 @@ export function Toolbar({
     if (!url) return;
     const normalizedUrl = url.includes("youtube") || url.includes("youtu.be") ? toYouTubeEmbedUrl(url) : url.trim();
     if (!isAllowedEmbedUrl(normalizedUrl)) {
-      toast("Ese dominio no está permitido. Usa PhET, YouTube, Vimeo, Canva, Spotify, SoundCloud, portales educativos oficiales o apps EDUmind.", "error");
+      toast("Ese dominio no está permitido. Usa PhET, YouTube, Vimeo, Canva, SoundCloud, portales educativos oficiales o apps EDUmind.", "error");
       return;
     }
     // Los LMS/portales institucionales (EVA, EducaMadrid…) prohíben el framing:
@@ -140,7 +147,7 @@ export function Toolbar({
         <ClipboardList size={22} />
         <span>Actividades</span>
       </button>
-      {WIDGET_GROUPS.map((group) => {
+      {WIDGET_GROUPS.filter((group) => group.id !== "apps").map((group) => {
         const Icon = group.icon;
         return (
           <button key={group.id} type="button" title={group.label}
@@ -160,6 +167,12 @@ export function Toolbar({
         <FilePlus2 size={22} />
         <span>Archivo</span>
       </button>
+      <button type="button" title="Archivo en Drive, OneDrive, Dropbox o Nextcloud"
+        className={activePanel === "nube" ? "toolbar-ink-active" : ""}
+        onClick={() => setActivePanel((current) => (current === "nube" ? null : "nube"))}>
+        <CloudUpload size={22} />
+        <span>Nube</span>
+      </button>
       <button type="button" title="Embed web" onClick={addWebEmbed}>
         <Link2 size={22} />
         <span>Web</span>
@@ -171,8 +184,23 @@ export function Toolbar({
 
       <div className="toolbar-divider-h" />
 
-      {/* Apps EDUmind + YouTube */}
+      {/* Apps EDUmind + YouTube.
+          Respirar y Apps estaban enterradas (Breath solo dentro del App Hub o
+          de una plantilla; el App Hub, dentro de «Manipulativos»). Aquí tienen
+          su sitio en el menú principal. */}
       <div className="toolbar-group-label">Apps</div>
+      <button type="button" title="Respiración guiada — elige estrategia"
+        className={activePanel === "breath" ? "toolbar-ink-active" : ""}
+        onClick={() => setActivePanel((current) => (current === "breath" ? null : "breath"))}>
+        <Wind size={22} />
+        <span>Respirar</span>
+      </button>
+      <button type="button" title="Apps EDUmind"
+        className={activePanel === "apps" ? "toolbar-ink-active" : ""}
+        onClick={() => setActivePanel((current) => (current === "apps" ? null : "apps"))}>
+        <Grid2x2 size={22} />
+        <span>Apps</span>
+      </button>
       {iframePresets.map(({ label, icon: Icon, url, title }) => (
         <button key={label} type="button" title={title}
           onClick={() => addPresetEmbed({ label, icon: Icon, url, title })}>
@@ -303,9 +331,28 @@ export function Toolbar({
         </section>
       </div>
     )}
+    {activePanel === "apps" && (
+      <AppsPanel
+        onInsert={(appId, modo) => addElementObject(createHubApp(appId, modo))}
+        onClose={() => setActivePanel(null)}
+      />
+    )}
+    {activePanel === "breath" && (
+      <BreathPanel
+        onInsert={(url, titulo) => addElementObject(createIframePreset(url, titulo))}
+        onClose={() => setActivePanel(null)}
+      />
+    )}
+    {activePanel === "nube" && (
+      <NubePanel
+        onInsert={(url, titulo, modo) => addElementObject(createIframePreset(url, titulo, modo))}
+        onClose={() => setActivePanel(null)}
+      />
+    )}
     {activePanel === "music" && (
       <MusicPanel
-        onInsert={(embedUrl, title) => addElementObject(createIframePreset(embedUrl, title))}
+        onInsert={(url, title, mode) => upsertMusica(createIframePreset(url, title, mode))}
+        onInsertNativo={(modeId, title) => upsertMusica(createMusicaPreset(modeId, title))}
         onClose={() => setActivePanel(null)}
       />
     )}

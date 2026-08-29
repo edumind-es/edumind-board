@@ -20,16 +20,23 @@ EDUmind Board es una PWA docente local-first para crear, proyectar y compartir t
 ```text
 edumind-board/
   apps/
-    web/                 React + Vite + Konva + Zustand + PWA
+    web/                 React + Vite + Konva + Zustand + PWA (vite-plugin-pwa)
       src/
-        components/      Shell visual, canvas y paneles
+        components/      Shell visual, canvas, paneles y ui/ (toasts, diálogos)
         activities/      Catalogo y factories de actividades guiadas
         ink/             Herramientas y geometría del lienzo global
         manipulatives/   Reglas puras de materiales manipulativos
         profiles/        Perfiles docentes y plantillas recomendadas
-        widgets/         Registro y catálogo de widgets
+        widgets/         Registro, despachador (renderers.tsx) y components/
+        three/           Escena WebGL de manipulativos 3D (chunk perezoso)
         lib/             Store, API, factories, IndexedDB y utilidades
-    api/                 Fastify + persistencia + auth + shares
+    api/                 Fastify modular
+      src/
+        app.ts           Factory buildApp() (usada también por los tests)
+        server.ts        Punto de entrada (listen)
+        auth/            Sesión firmada y flujo OIDC
+        routes/          auth, boards, sala, resources, uploads
+        test/            Tests de integración con fastify.inject()
   packages/
     shared/              Schemas Zod, tipos y contratos de seguridad
   docs/                  Arquitectura, decisiones y planes técnicos
@@ -133,6 +140,34 @@ Prueba asociada:
 npm --workspace @edumind-board/web run check:base10
 ```
 
+### 5.1 Manipulativos 3D reales (widget `mates3d`)
+
+`src/manipulatives/space3d.ts` define las reglas puras del manipulativo 3D
+(WebGL con three + react-three-fiber, render en `src/three/`):
+
+- dimensiones con proporción matemática real: unidad 1×1×1, decena 10×1×1,
+  centena 10×1×10, millar 10×10×10 — el volumen en unidades cúbicas ES el valor;
+- canjes ascendentes por proximidad y descomposiciones reversibles que
+  conservan el valor total;
+- sólidos con caras/aristas/vértices: prisma y pirámide son paramétricos por
+  número de lados de la base (`solidFacts(kind, n)` calcula F/A/V y cumple
+  Euler para cualquier n).
+
+Desde el lienzo global, un sólido dibujado (proyección 2D) puede "abrirse en
+3D": crea un widget `mates3d` en modo sólidos con el cuerpo y número de lados
+equivalentes (`createMates3dSolid`). Así el boceto rápido del lienzo y el
+manipulativo tridimensional real quedan enlazados.
+
+La escena 3D se carga con React.lazy en el chunk `vendor-3d`: el bundle
+principal no crece si el board no usa el widget. La cámara se persiste en el
+documento del board. Rendimiento PDI: `frameloop="demand"` y DPR limitado.
+
+Prueba asociada:
+
+```bash
+npm --workspace @edumind-board/web run check:space3d
+```
+
 ## 6. Datos
 
 El contrato persistido vive en `packages/shared/src/schemas.ts`.
@@ -157,6 +192,24 @@ Toda nueva entidad persistente debe:
 - tener valor por defecto o migración;
 - mantener compatibilidad con boards antiguos;
 - ser validable en backend y frontend.
+
+### 6.1 Sincronización local ↔ nube
+
+La fuente de verdad de trabajo es **IndexedDB** (`apps/web/src/lib/localDb.ts`):
+la app crea, edita y guarda sin cuenta ni red. Con sesión EDUmind, la nube es un
+**espejo opcional** de los tableros del docente (tabla `boards`, por `owner_id`).
+
+- **Endpoint:** `PUT /api/boards/:id` hace upsert del borrador conservando el id
+  del cliente (sin versionar; `/publish` es aparte). Conflicto por `updatedAt`:
+  si el servidor tiene una versión más nueva, responde `409` con su copia.
+- **Orquestación** (`apps/web/src/lib/sync.ts`): al iniciar sesión, reconciliación
+  bidireccional (sube solo-local, baja solo-nube, gana el `updatedAt` mayor);
+  tras editar, push con debounce del tablero activo; en conflicto no se pisa la
+  edición en curso. Estado visible en la topbar.
+- **Invariante local-first:** todo el código de sync está condicionado a sesión;
+  el flujo anónimo no cambia. La nube nunca es requisito para trabajar.
+- **Limitación conocida (MVP):** el borrado usa borrado remoto directo, no
+  tombstones; borrar sin red puede reaparecer en la siguiente reconciliación.
 
 ## 7. Actividades
 
@@ -212,13 +265,18 @@ Comandos mínimos antes de release:
 
 ```bash
 npm run typecheck
+npm run test
 npm --workspace @edumind-board/web run check:activities
 npm --workspace @edumind-board/web run check:geometry
 npm --workspace @edumind-board/web run check:base10
+npm --workspace @edumind-board/web run check:space3d
 npm run build
 npm run check:contracts
 npm run smoke:web
 ```
+
+Esta batería se ejecuta automáticamente en cada push y PR mediante
+`.github/workflows/ci.yml` (CI en GitHub Actions, Node 20).
 
 Los cambios visuales relevantes deben cubrir:
 
@@ -247,6 +305,28 @@ Flujo esperado:
 7. Verificación manual breve de canvas, widgets y PDI.
 
 No se debe desplegar una iteración que no tenga rollback claro.
+
+El empaquetado se puede generar desde CI con `.github/workflows/release.yml`
+(disparo manual `workflow_dispatch`): verifica y sube los artefactos web/API/
+shared como tarballs. **No hace deploy automático** por política; el job de
+deploy queda documentado y desactivado dentro del propio workflow.
+
+### 11.1 Actualización de la PWA
+
+La app es una PWA con service worker (vite-plugin-pwa, estrategia `generateSW`
+en modo `prompt`). El registro y la política de actualización viven en
+`apps/web/src/lib/registerPwa.ts`:
+
+- comprobación de versión cada hora y al recuperar foco/conexión;
+- aviso no intrusivo con botón «Actualizar» cuando hay versión nueva;
+- auto-aplicación al ocultar la pestaña, de modo que la siguiente sesión
+  arranca fresca sin recargar en mitad de una clase.
+
+Requisito del servidor web (Nginx) para que las actualizaciones lleguen: servir
+`index.html` y `sw.js` con `Cache-Control: no-cache` (o `no-store`). Si el
+proxy cachea el service worker, los clientes pueden quedarse anclados a una
+versión antigua entre sesiones. Los assets con hash (`/assets/*`) sí pueden
+cachearse de forma inmutable.
 
 ## 12. Roadmap Técnico Inmediato
 

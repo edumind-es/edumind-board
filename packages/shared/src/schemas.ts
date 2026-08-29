@@ -5,7 +5,6 @@ export const allowedEmbedHosts = [
   "www.youtube.com",
   "youtube.com",
   "www.youtube-nocookie.com",
-  "open.spotify.com",
   "w.soundcloud.com",
   "player.vimeo.com",
   "vimeo.com",
@@ -29,6 +28,27 @@ export const allowedEmbedHosts = [
   "recursos.edumind.es"
 ] as const;
 
+/**
+ * Nubes de terceros que SÍ permiten verse dentro de un iframe con su URL de
+ * vista previa. Están aparte de `allowedEmbedHosts` porque no son recursos
+ * educativos ni apps EDUmind: son almacenamiento del docente, y conviene poder
+ * enumerarlos (avisos de privacidad, pruebas) sin mezclarlos con el resto.
+ *
+ * Nextcloud u ownCloud autoalojados no pueden estar aquí: el dominio lo pone
+ * cada centro. Esas URLs se añaden como tarjeta-lanzador (ver `nube.ts` en la
+ * web), que abre en pestaña nueva en vez de un marco en blanco.
+ */
+export const allowedCloudHosts = [
+  "drive.google.com",
+  "docs.google.com",
+  "onedrive.live.com",
+  "1drv.ms",
+  "sharepoint.com",
+  "dropbox.com",
+  "www.dropbox.com",
+  "dl.dropboxusercontent.com"
+] as const;
+
 export const allowedInstitutionalEmbedSuffixes = [
   "edu.xunta.gal",
   "educa.madrid.org",
@@ -49,6 +69,8 @@ export function isAllowedEmbedUrl(url: string) {
     if (!["https:", "http:"].includes(parsed.protocol)) return false;
     if (parsed.protocol === "http:" && parsed.hostname !== "localhost") return false;
     return allowedEmbedHosts.some(
+      (host) => parsed.hostname === host || parsed.hostname.endsWith(`.${host}`)
+    ) || allowedCloudHosts.some(
       (host) => parsed.hostname === host || parsed.hostname.endsWith(`.${host}`)
     ) || allowedInstitutionalEmbedSuffixes.some(
       (suffix) => parsed.hostname === suffix || parsed.hostname.endsWith(`.${suffix}`)
@@ -80,6 +102,7 @@ export const boardElementTypeSchema = z.enum([
   "image",
   "file",
   "iframe",
+  "musica",
   "timer",
   "semaphore",
   "clock",
@@ -149,9 +172,12 @@ export const imageElementSchema = elementBaseSchema.extend({
 export const fileElementSchema = elementBaseSchema.extend({
   type: z.literal("file"),
   data: z.object({
-    // data: (modo local), https:// (producción) o http://localhost* (API en desarrollo)
+    // data: (empotrado en el tablero), local:<id> (IndexedDB de ESTE navegador,
+    // para archivos grandes que no viajan al servidor), https:// (producción)
+    // o http://localhost* (API en desarrollo)
     url: z.string().refine((value) =>
       value.startsWith("data:") ||
+      value.startsWith("local:") ||
       value.startsWith("https://") ||
       value.startsWith("/api/uploads/") ||
       value.startsWith("http://localhost")
@@ -165,11 +191,40 @@ export const fileElementSchema = elementBaseSchema.extend({
 export const iframeElementSchema = elementBaseSchema.extend({
   type: z.literal("iframe"),
   data: z.object({
-    url: z.string().url().refine(isAllowedEmbedUrl, "Embed host is not allowed"),
+    url: z.string().url(),
     title: z.string().max(160).default("Recurso embebido"),
     // "embed" = iframe en el tablero; "launcher" = tarjeta con botón que abre en
     // pestaña nueva (para sitios que prohíben el framing, como EVA/LMS).
     mode: z.enum(["embed", "launcher"]).default("embed")
+  }).superRefine((data, ctx) => {
+    // La lista de dominios protege de lo único peligroso: meter una página
+    // ajena DENTRO del tablero. Una tarjeta-lanzador no empotra nada, solo
+    // abre en otra pestaña un enlace que el docente ha pegado, así que le
+    // basta con ser https. Sin esta distinción no se podía enlazar el
+    // Nextcloud del centro, cuyo dominio no se puede conocer de antemano.
+    if (data.mode === "launcher") {
+      if (!data.url.startsWith("https://") && !data.url.startsWith("http://localhost")) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["url"], message: "Launcher URLs must be https" });
+      }
+      return;
+    }
+    if (!isAllowedEmbedUrl(data.url)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["url"], message: "Embed host is not allowed" });
+    }
+  })
+});
+
+// Música de aula servida por el propio servidor (ver routes/musica.ts).
+// Sólo guarda a qué modo de trabajo pertenece: las pistas viven en el
+// catálogo del servidor, así que recurar la música no obliga a tocar los
+// tableros que ya existen.
+export const musicaElementSchema = elementBaseSchema.extend({
+  type: z.literal("musica"),
+  data: z.object({
+    modeId: z.string().min(1).max(40),
+    titulo: z.string().max(80).default("Música de aula"),
+    // Reanudar donde se quedó al reabrir el tablero.
+    pistaId: z.string().max(80).optional()
   })
 });
 
@@ -495,7 +550,20 @@ export const connectorElementSchema = elementBaseSchema.extend({
     strokeWidth: z.number().min(1).max(16).default(4),
     style: z.enum(["straight", "elbow", "dashed"]).default("straight"),
     arrowStart: z.boolean().default(false),
-    arrowEnd: z.boolean().default(true)
+    arrowEnd: z.boolean().default(true),
+    // Extremos en coordenadas NORMALIZADAS dentro del propio recuadro (0..1).
+    // Antes la flecha era siempre horizontal de izquierda a derecha, así que
+    // unir dos elementos en diagonal era imposible sin recolocar a mano. El
+    // valor por defecto reproduce exactamente la flecha horizontal de antes,
+    // de modo que los tableros ya existentes no cambian.
+    desde: z.object({ x: z.number().min(-1).max(2), y: z.number().min(-1).max(2) })
+      .default({ x: 0, y: 0.5 }),
+    hasta: z.object({ x: z.number().min(-1).max(2), y: z.number().min(-1).max(2) })
+      .default({ x: 1, y: 0.5 }),
+    // Anclaje a otros elementos: si están, la flecha se recoloca sola cuando
+    // el origen o el destino se mueven (conexión rápida estilo mapa mental).
+    anclaDesde: z.string().optional(),
+    anclaHasta: z.string().optional()
   })
 });
 
@@ -519,6 +587,7 @@ export const boardElementSchema = z.discriminatedUnion("type", [
   imageElementSchema,
   fileElementSchema,
   iframeElementSchema,
+  musicaElementSchema,
   timerElementSchema,
   semaphoreElementSchema,
   clockElementSchema,
@@ -650,7 +719,9 @@ export const createShareSchema = z.object({
 
 export function assertBoardEmbedsAllowed(board: BoardDocument) {
   const blocked = board.elements.filter(
-    (element) => element.type === "iframe" && !isAllowedEmbedUrl(element.data.url)
+    // Las tarjetas-lanzador no empotran nada: no pasan por la lista (ver el
+    // superRefine de iframeElementSchema).
+    (element) => element.type === "iframe" && element.data.mode !== "launcher" && !isAllowedEmbedUrl(element.data.url)
   );
   if (blocked.length > 0) {
     throw new Error("Board contains iframe URLs outside the allowed embed list");

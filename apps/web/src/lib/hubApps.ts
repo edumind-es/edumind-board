@@ -1,8 +1,13 @@
 // Definición de las apps EDUmind integrables como widget hub.
 // Añadir aquí cuando una nueva app del ecosistema soporte el Board Plugin Protocol.
 
+import type { BoardElement } from "@edumind-board/shared";
+
+/** El id es el mismo que acepta el widget hub: una sola verdad, no dos listas. */
+export type HubAppId = Extract<BoardElement, { type: "hub" }>["data"]["appId"];
+
 export type HubApp = {
-  id: string;
+  id: HubAppId;
   name: string;
   emoji: string;
   url: string;
@@ -84,7 +89,7 @@ export const HUB_APPS: HubApp[] = [
   }
 ];
 
-export function getHubApp(id: string): HubApp | undefined {
+export function getHubApp(id: HubAppId): HubApp | undefined {
   return HUB_APPS.find((a) => a.id === id);
 }
 

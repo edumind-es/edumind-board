@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { newId } from "./lib/ids";
 import { BoxSelect, Circle, Cloud, CloudOff, Copy, History, Library, LogIn, LogOut, Magnet, Minus, Moon, RefreshCw, RotateCcw, Save, Send, ShieldOff, Sun, User, Users, X, ZoomIn } from "lucide-react";
-import { boardDocumentSchema, type Activity } from "@edumind-board/shared";
+import {
+  boardDocumentSchema,
+  enMegas,
+  MAX_LOCAL_BYTES,
+  type Activity
+} from "@edumind-board/shared";
 import { AuthBanner } from "./components/AuthBanner";
 import { FeedbackHost, confirmDialog, toast } from "./components/ui/feedback";
 import { ActivityGuide } from "./components/ActivityGuide";
@@ -19,8 +24,9 @@ import { ShareView } from "./components/ShareView";
 import { Toolbar } from "./components/Toolbar";
 import { createActivity, type ActivityBlueprint } from "./activities/catalog";
 import { apiBaseUrl } from "./lib/api";
-import { createShare, deleteRemoteBoard, listShares, publishBoard, revokeShare, uploadAsset } from "./lib/api";
+import { createShare, deleteRemoteBoard, listShares, publishBoard, revokeShare } from "./lib/api";
 import { pushBoard, reconcileBoards } from "./lib/sync";
+import { ArchivoDemasiadoGrande, guardarArchivoLocal } from "./lib/almacenLocal";
 import { trackEvent, pruneOldEvents } from "./lib/analytics";
 import { isTrustedOrigin, type PluginMessage } from "./lib/hubApps";
 import { checkAuth, getLoginUrl, getLogoutUrl, type AuthState } from "./lib/auth";
@@ -690,51 +696,36 @@ show();
       return;
     }
 
-    // Con sesión el archivo se sube al servidor (hasta 8 MB) y el board solo
-    // guarda la URL. Sin sesión se embebe como data: (límite 1,5 MB).
-    const localMaxBytes = 1.5 * 1024 * 1024;
-    const uploadMaxBytes = 8 * 1024 * 1024;
-    if (file.size > (isAuthenticated ? uploadMaxBytes : localMaxBytes)) {
+    // ⛔ Un solo camino: el archivo se queda en ESTE navegador (IndexedDB) y el
+    // tablero guarda `local:<id>`. EDUmind Board no guarda documentos de nadie
+    // — ni subidos al servidor ni empotrados en base64 dentro del tablero, que
+    // acabarían igualmente en nuestra base al publicarlo.
+    if (file.size > MAX_LOCAL_BYTES) {
       toast(
-        isAuthenticated
-          ? "Archivo demasiado grande. El límite es 8 MB."
-          : "Archivo demasiado grande. Sin sesión el límite es 1,5 MB; inicia sesión para subir hasta 8 MB.",
+        `«${file.name}» ocupa ${enMegas(file.size)} y el máximo que admite el navegador es ${enMegas(MAX_LOCAL_BYTES)}.`,
         "error"
       );
       return;
     }
 
-    let url: string | null = null;
-    if (isAuthenticated) {
-      try {
-        const uploaded = await uploadAsset(file);
-        url = `${apiBaseUrl}${uploaded.url}`;
-      } catch (error) {
-        console.error(error);
-        if (file.size > localMaxBytes) {
-          toast("No se pudo subir el archivo al servidor. Inténtalo de nuevo.", "error");
-          return;
-        }
-        toast("No se pudo subir al servidor; se guarda dentro del board.", "info");
-      }
+    try {
+      const url = await guardarArchivoLocal(newId(), file);
+      useBoardStore.getState().addElementObject(
+        createFileElement({
+          url,
+          name: file.name,
+          mimeType: file.type as "application/pdf" | "image/jpeg" | "image/png"
+        })
+      );
+    } catch (error) {
+      console.error(error);
+      toast(
+        error instanceof ArchivoDemasiadoGrande
+          ? `El navegador no admite archivos de más de ${enMegas(MAX_LOCAL_BYTES)}.`
+          : "No se pudo guardar el archivo en este navegador. Puede que no quede espacio libre.",
+        "error"
+      );
     }
-
-    if (!url) {
-      url = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result));
-        reader.onerror = () => reject(reader.error);
-        reader.readAsDataURL(file);
-      });
-    }
-
-    useBoardStore.getState().addElementObject(
-      createFileElement({
-        url,
-        name: file.name,
-        mimeType: file.type as "application/pdf" | "image/jpeg" | "image/png"
-      })
-    );
   }
 
   async function onPublish() {

@@ -27,7 +27,9 @@ try {
 
   const sharedBuild = spawnSync("npm", ["--workspace", "@edumind-board/shared", "run", "build"], {
     cwd: rootDir,
-    encoding: "utf8"
+    encoding: "utf8",
+    // Solo hace falta que existan los .d.ts; tsc no vacia el directorio.
+    env: { ...process.env, GUARDIA_DIST_OMITIR: "1" }
   });
   assert(sharedBuild.status === 0, sharedBuild.stderr || sharedBuild.stdout || "shared no compila");
 

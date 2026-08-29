@@ -81,7 +81,7 @@ export function Inspector() {
 
   const typeLabel: Record<BoardElement["type"], string> = {
     note: "Nota", text: "Texto", image: "Imagen", file: "Archivo",
-    iframe: "Web", timer: "Temporizador", semaphore: "Semáforo",
+    iframe: "Web", musica: "Música", timer: "Temporizador", semaphore: "Semáforo",
     clock: "Reloj", dice: "Dado", spinner: "Ruleta",
     guidelines: "Pauta escritura", math: "Matemáticas", base10: "Base 10", mates3d: "Mates 3D", mindmap: "Mapa mental", dictadoNum: "Dictado numérico",
     fraction: "Fracciones", algorithm: "Algoritmo", logic: "Lógica matemática",
@@ -183,7 +183,7 @@ export function Inspector() {
           <label>Título <input value={fieldValue(element, "title")} onChange={(e) => updateElementData(element.id, { title: e.target.value })} /></label>
           <label>URL <input value={fieldValue(element, "url")} onChange={(e) => updateElementData(element.id, { url: e.target.value })} placeholder="https://..." /></label>
           {!isAllowedEmbedUrl(fieldValue(element, "url")) && fieldValue(element, "url") && (
-            <p className="warning">Dominio no permitido para publicar. Usa plataformas admitidas como PhET, YouTube, Vimeo, Canva, Spotify, SoundCloud, editoriales permitidas, dominios EDUmind y entornos educativos oficiales de consejerías.</p>
+            <p className="warning">Dominio no permitido para publicar. Usa plataformas admitidas como PhET, YouTube, Vimeo, Canva, SoundCloud, editoriales permitidas, dominios EDUmind y entornos educativos oficiales de consejerías.</p>
           )}
           <label>
             Cómo mostrarlo

@@ -26,7 +26,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import type { BoardElementType } from "@edumind-board/shared";
 
-export type WidgetCategoryId = "aula" | "contenido" | "manipulativos";
+export type WidgetCategoryId = "aula" | "contenido" | "manipulativos" | "apps";
 
 export type WidgetDefinition = {
   type: BoardElementType;
@@ -50,6 +50,9 @@ export const WIDGETS: WidgetDefinition[] = [
   { type: "dice", label: "Dado", icon: Dices, category: "aula" },
   { type: "spinner", label: "Ruleta", icon: RefreshCw, category: "aula" },
   { type: "dictadoNum", label: "Dictado numérico", icon: Hash, category: "aula", featured: true },
+  // El medidor de ruido vivía en «Manipulativos», donde ningún docente lo
+  // encontraba: es una herramienta de clima de aula.
+  { type: "noise", label: "Ruido", icon: Mic, category: "aula", featured: true },
 
   { type: "note", label: "Nota", icon: StickyNote, category: "contenido", featured: true },
   { type: "text", label: "Texto", icon: FileText, category: "contenido" },
@@ -69,15 +72,18 @@ export const WIDGETS: WidgetDefinition[] = [
   { type: "grid", label: "Cuadrícula", icon: Grid2x2, category: "manipulativos" },
   { type: "table", label: "Tabla", icon: LayoutGrid, category: "manipulativos" },
   { type: "pictos", label: "Pictos", icon: Images, category: "manipulativos" },
-  { type: "noise", label: "Ruido", icon: Mic, category: "manipulativos" },
   { type: "qr", label: "QR", icon: QrCode, category: "manipulativos" },
-  { type: "hub", label: "App Hub", icon: Smartphone, category: "manipulativos" }
+
+  // Las apps del ecosistema no son un manipulativo matemático: tienen sitio
+  // propio en el menú principal.
+  { type: "hub", label: "App Hub", icon: Smartphone, category: "apps", featured: true }
 ];
 
 const GROUP_META: Array<Omit<WidgetGroup, "widgets">> = [
   { id: "aula", label: "Aula", icon: TrafficCone },
   { id: "contenido", label: "Contenido", icon: StickyNote },
-  { id: "manipulativos", label: "Manipulativos", icon: Cuboid }
+  { id: "manipulativos", label: "Manipulativos", icon: Cuboid },
+  { id: "apps", label: "Apps", icon: Smartphone }
 ];
 
 export const WIDGET_GROUPS: WidgetGroup[] = GROUP_META.map((group) => ({
