@@ -21,10 +21,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Configurar Node.js 20
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           # La misma que corre en produccion. Estaba en 20 mientras el
           # servidor iba con 22: el CI validaba un runtime que no era el real.
