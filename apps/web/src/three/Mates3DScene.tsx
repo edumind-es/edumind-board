@@ -54,7 +54,7 @@ function DraggablePiece({
   editable: boolean;
   onMove: (id: string, x: number, z: number) => void;
   onCommit: () => void;
-  controlsRef: React.RefObject<OrbitControlsImpl>;
+  controlsRef: React.RefObject<OrbitControlsImpl | null>;
 }) {
   const [w, h, d] = PIECE_DIMENSIONS[piece.kind];
   const materials = useMemo(() => pieceMaterials(piece.kind), [piece.kind]);
@@ -191,7 +191,7 @@ function SolidExplorer({ element }: { element: Mates3dElement }) {
 function CameraRig({
   controlsRef, onPersist, autoRotate
 }: {
-  controlsRef: React.RefObject<OrbitControlsImpl>;
+  controlsRef: React.RefObject<OrbitControlsImpl | null>;
   onPersist: (position: [number, number, number], target: [number, number, number]) => void;
   autoRotate: boolean;
 }) {

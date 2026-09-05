@@ -28,31 +28,58 @@ export default defineConfig({
       }
     })
   ],
-  envDir: resolve(__dirname, "../.."),
+  envDir: resolve(import.meta.dirname, "../.."),
   build: {
-    rollupOptions: {
+    rolldownOptions: {
       output: {
-        manualChunks(id) {
-          // El helper de precarga de Vite lo comparten index y los chunks
-          // perezosos: en un chunk propio diminuto nadie arrastra a nadie.
-          if (id.includes("vite/preload-helper")) return "preload";
-          if (!id.includes("node_modules")) return;
-          if (id.includes("qrcode") || id.includes("pngjs")) return "vendor-qr";
-          // Motor 3D y transitivas de drei/fiber: chunk perezoso, nunca eager.
-          // OJO: react-reconciler e its-fine NO van aquí — react-konva (eager)
-          // también los usa y crearían un ciclo que arrastraría todo el 3D.
-          if (/[\\/]node_modules[\\/](three|three-stdlib|@react-three|maath|camera-controls|detect-gpu|glsl-noise|troika|meshline|stats-gl|stats\.js|three-mesh-bvh|suspend-react|webgl-sdf-generator|bidi-js|hls\.js|tunnel-rat|utility-types|react-composer|@mediapipe|draco)/.test(id)) {
-            return "vendor-3d";
-          }
-          if (id.includes("idb") || id.includes("zustand") || id.includes("zod")) return "vendor-state";
-          return "vendor";
+        // Troceado explícito por grupos: la API nativa de rolldown, que es el
+        // empaquetador de Vite desde la 8. `manualChunks` sigue aceptándose por
+        // compatibilidad, pero rolldown NO lo respeta del todo: reasignaba
+        // zustand a vendor-3d aunque la función lo mandara a vendor-state.
+        //
+        // Gana la `priority` más alta, y el módulo capturado se retira de los
+        // demás grupos.
+        codeSplitting: {
+          // Rolldown, por defecto, mete tambien las DEPENDENCIAS de lo que
+          // captura un grupo. Con eso vendor-3d se llevaba react/jsx-runtime,
+          // scheduler e its-fine —nucleo que carga siempre— y el chunk 3D
+          // acababa en el arranque. Rollup (Vite 6) nunca lo hizo: asignaba
+          // solo el modulo que casaba, y es el reparto que queremos.
+          includeDependenciesRecursively: false,
+          groups: [
+            // El helper de precarga de Vite lo comparten index y los chunks
+            // perezosos: en un chunk propio diminuto nadie arrastra a nadie.
+            { name: "preload", test: /vite[\\/]preload-helper/, priority: 50 },
+
+            { name: "vendor-qr", test: /[\\/]node_modules[\\/](qrcode|pngjs)[\\/]/, priority: 40 },
+
+            // ⚠️ vendor-state va POR DELANTE de vendor-3d a propósito. zustand
+            // lo usan el store de la app (que carga siempre) y
+            // @react-three/fiber (que carga en diferido). Si zustand cae del
+            // lado del 3D, el chunk de 910 kB entra en el camino inicial porque
+            // el store lo necesita al arrancar: pasó al subir a Vite 8 y el
+            // index.html acabó precargándolo. Es la misma trampa anotada abajo
+            // para react-reconciler e its-fine con react-konva.
+            { name: "vendor-state", test: /[\\/]node_modules[\\/](idb|zustand|zod)[\\/]/, priority: 30 },
+
+            // Motor 3D y transitivas de drei/fiber: chunk perezoso, nunca eager.
+            // OJO: react-reconciler e its-fine NO van aquí — react-konva (eager)
+            // también los usa y crearían un ciclo que arrastraría todo el 3D.
+            {
+              name: "vendor-3d",
+              test: /[\\/]node_modules[\\/](three|three-stdlib|@react-three|maath|camera-controls|detect-gpu|glsl-noise|troika|meshline|stats-gl|stats\.js|three-mesh-bvh|suspend-react|webgl-sdf-generator|bidi-js|hls\.js|tunnel-rat|utility-types|react-composer|@mediapipe|draco)[\\/]/,
+              priority: 20
+            },
+
+            { name: "vendor", test: /[\\/]node_modules[\\/]/, priority: 10 }
+          ]
         }
       }
     }
   },
   resolve: {
     alias: {
-      "@edumind-board/shared": resolve(__dirname, "../../packages/shared/src")
+      "@edumind-board/shared": resolve(import.meta.dirname, "../../packages/shared/src")
     }
   },
   server: {

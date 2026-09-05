@@ -1,6 +1,12 @@
 # Dependencies
 node_modules/
 vendor/
+# ...pero `apps/web/public/vendor/` NO es una dependencia: es el sistema de
+# diseno Lamina vendorizado, y el index.html lo carga con
+# <link href="/vendor/lamina-v1.css">. La regla de arriba (pensada para
+# Composer) lo dejaba fuera de la release publica, asi que quien clonaba se
+# quedaba sin los estilos y sin ningun error que lo explicara.
+!apps/web/public/vendor/
 venv/
 .venv/
 __pycache__/

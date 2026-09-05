@@ -55,6 +55,9 @@ jobs:
       - name: Contratos de producción
         run: npm run check:contracts
 
+      - name: El motor 3D se queda fuera del arranque
+        run: npm run check:arranque
+
       - name: Tests del API
         run: npm run test
 

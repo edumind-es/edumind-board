@@ -19,7 +19,8 @@
     "test": "npm run test --workspaces --if-present",
     "smoke:web": "npm --workspace @edumind-board/web run smoke",
     "check:subida": "node scripts/check-limite-subida.mjs",
-    "check:csp": "node scripts/check-csp-frame-src.mjs"
+    "check:csp": "node scripts/check-csp-frame-src.mjs",
+    "check:arranque": "node scripts/check-arranque-3d.mjs"
   },
   "engines": {
     "node": ">=20.0.0"
