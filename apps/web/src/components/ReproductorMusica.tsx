@@ -48,15 +48,33 @@ export function ReproductorMusica({
 
     const pista = pistas?.[indice];
 
+    // Cambiar de pista sólo cambia el `src`: el navegador carga el audio nuevo
+    // pero NO lo arranca. Sin esto, la lista se paraba al acabar la primera.
+    const encadenar = useRef(false);
+
+    // `play()` no devuelve promesa en todos los entornos (jsdom, navegadores
+    // viejos): sin esta cautela, encadenar reventaría en las pruebas.
+    function reproducir(audio: HTMLAudioElement) {
+        audio.play()?.catch(() => setFallo("El navegador no ha dejado reproducir."));
+    }
+
+    useEffect(() => {
+        const audio = audioRef.current;
+        if (!audio || !encadenar.current) return;
+        encadenar.current = false;
+        reproducir(audio);
+    }, [pista?.id]);
+
     function alternar() {
         const audio = audioRef.current;
         if (!audio) return;
-        if (audio.paused) void audio.play().catch(() => setFallo("El navegador no ha dejado reproducir."));
+        if (audio.paused) reproducir(audio);
         else audio.pause();
     }
 
-    function siguiente() {
+    function siguiente(seguirSonando = sonando) {
         if (!pistas || pistas.length === 0) return;
+        encadenar.current = seguirSonando;
         const proximo = (indice + 1) % pistas.length;
         setIndice(proximo);
         onPistaChange?.(pistas[proximo]!.id);
@@ -98,7 +116,7 @@ export function ReproductorMusica({
                     aria-label={sonando ? "Pausar música" : "Reproducir música"}>
                     {sonando ? <Pause size={18} /> : <Play size={18} />}
                 </button>
-                <button type="button" onClick={siguiente} aria-label="Pista siguiente"
+                <button type="button" onClick={() => siguiente()} aria-label="Pista siguiente"
                     disabled={pistas.length < 2}>
                     <SkipForward size={18} />
                 </button>
@@ -113,7 +131,7 @@ export function ReproductorMusica({
                 src={pista ? `${apiBaseUrl}/api/musica/pista/${encodeURIComponent(pista.id)}` : undefined}
                 onPlay={() => setSonando(true)}
                 onPause={() => setSonando(false)}
-                onEnded={siguiente}
+                onEnded={() => siguiente(true)}
                 onError={() => setFallo("No se pudo cargar esta pista.")}
                 preload="none"
             />

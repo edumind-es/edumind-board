@@ -5,6 +5,7 @@ import { searchArasaac as searchArasaacApi, type ArasaacPictogram } from "../lib
 import { useBoardStore } from "../lib/store";
 import { HUB_APPS } from "../lib/hubApps";
 import { newId } from "../lib/ids";
+import { NIVELES_VOZ } from "../lib/nivelesVoz";
 import { confirmDialog } from "./ui/feedback";
 
 function fieldValue(element: BoardElement, key: string) {
@@ -793,11 +794,15 @@ export function Inspector() {
       {element.type === "noise" && (
         <>
           <label>Etiqueta <input value={element.data.label} onChange={(e) => updateElementData(element.id, { label: e.target.value })} /></label>
-          <label>Umbral de alerta ({element.data.threshold}%)
-            <input type="range" min={10} max={90} value={element.data.threshold}
-              onChange={(e) => updateElementData(element.id, { threshold: Number(e.target.value) })} />
+          <label>Límite de voz: {element.data.limite} · {NIVELES_VOZ[element.data.limite]?.nombre}
+            <input type="range" min={0} max={5} step={1} value={element.data.limite}
+              onChange={(e) => updateElementData(element.id, { limite: Number(e.target.value) })} />
           </label>
-          <p className="inspector-hint">Activa el micrófono pulsando "Activar" en el widget. Requiere permiso del navegador.</p>
+          <p className="inspector-hint">
+            Arrastra entre los escalones: 0 silencio de biblioteca … 5 voz de patio.
+            Pasarse del límite más de un segundo suma un aviso; el botón «0» del widget los reinicia.
+          </p>
+          <p className="inspector-hint">Activa el micrófono pulsando ▶ en el widget. Requiere permiso del navegador.</p>
         </>
       )}
 

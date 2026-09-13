@@ -74,6 +74,24 @@ describe("ReproductorMusica", () => {
         expect(await screen.findByText("Late Night Radio")).toBeTruthy();
     });
 
+    it("al acabar una pista arranca la siguiente sola", async () => {
+        // El fallo que esto evita: sonaba una canción y la lista se paraba.
+        const play = vi.fn().mockResolvedValue(undefined);
+        vi.spyOn(HTMLMediaElement.prototype, "play").mockImplementation(play);
+
+        const { container } = render(<ReproductorMusica modeId="individual" titulo="Música" />);
+        await screen.findByText("Late Night Radio");
+
+        const audio = container.querySelector("audio")!;
+        await userEvent.click(screen.getByLabelText("Reproducir música"));
+        audio.dispatchEvent(new Event("play"));
+        audio.dispatchEvent(new Event("ended"));
+
+        expect(await screen.findByText("Northern Glade")).toBeTruthy();
+        await waitFor(() => expect(play.mock.calls.length).toBeGreaterThan(1));
+        vi.restoreAllMocks();
+    });
+
     it("un modo sin pistas lo dice, no se queda en blanco", async () => {
         render(<ReproductorMusica modeId="vacio" titulo="Música" />);
         expect(await screen.findByText(/todavía no tiene pistas/i)).toBeTruthy();

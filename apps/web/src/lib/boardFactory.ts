@@ -240,8 +240,8 @@ export function createElement(type: BoardElement["type"]): BoardElement {
 
     case "noise":
       return {
-        ...base, type, width: 320, height: 180,
-        data: { threshold: 50, label: "Nivel de ruido", color: "#c45d3e" }
+        ...base, type, width: 280, height: 360,
+        data: { limite: 2, label: "Nivel de voz", color: "#c45d3e" }
       };
 
     case "qr":
