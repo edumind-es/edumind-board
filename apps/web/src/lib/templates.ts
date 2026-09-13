@@ -143,7 +143,7 @@ function grid(x: number, y: number, w = 560, h = 360): Omit<BoardElement, "id"> 
   };
 }
 function noise(x: number, y: number): Omit<BoardElement, "id"> {
-  return { ...base(x, y, 320, 190, 2), type: "noise", data: { threshold: 50, label: "Nivel de ruido", color: "#c45d3e" } };
+  return { ...base(x, y, 280, 360, 2), type: "noise", data: { limite: 2, label: "Nivel de voz", color: "#c45d3e" } };
 }
 function qr(text: string, label: string, x: number, y: number): Omit<BoardElement, "id"> {
   return { ...base(x, y, 220, 260), type: "qr", data: { text, label, bgColor: "#ffffff", fgColor: "#22302f" } };

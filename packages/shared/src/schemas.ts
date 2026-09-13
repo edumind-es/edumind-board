@@ -515,8 +515,9 @@ export const drawingElementSchema = elementBaseSchema.extend({
 export const noiseElementSchema = elementBaseSchema.extend({
   type: z.literal("noise"),
   data: z.object({
-    threshold: z.number().min(10).max(90).default(50),
-    label: z.string().max(80).default("Nivel de ruido"),
+    // Nivel de voz máximo permitido: 0 (silencio de biblioteca) … 5 (patio).
+    limite: z.number().int().min(0).max(5).default(2),
+    label: z.string().max(80).default("Nivel de voz"),
     color: z.string().default("#c45d3e")
   })
 });
