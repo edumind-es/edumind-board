@@ -267,6 +267,10 @@ export function BoardLibrary({
           ·{" "}
           <a href="https://github.com/edumind-es/edumind-board" target="_blank" rel="noopener noreferrer">
             Código fuente en GitHub
+          </a>{" "}
+          ·{" "}
+          <a href="https://github.com/edumind-es/edumind-board/blob/main/CREDITS.md" target="_blank" rel="noopener noreferrer">
+            Créditos
           </a>
         </small>
       </footer>
