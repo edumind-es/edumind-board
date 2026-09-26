@@ -91,7 +91,7 @@ button.danger {
   background: var(--board-bg);
 }
 
-/* ── Tema E-INK real (del sistema /var/www/e-ink_edumind) ───────────── */
+/* ── Tema E-INK real (del sistema e-ink de EDUmind) ─────────────────── */
 
 .theme-eink {
   /* Paleta e-ink auténtica — tonos tierra, nunca puros #000/#fff */
