@@ -376,7 +376,7 @@ export const BOARD_TEMPLATES: BoardTemplate[] = [
   {
     id: "equipo-retro",
     name: "Equipo · Retrospectiva",
-    description: "Columnas de mejora, acuerdos y bloqueos para trabajo cooperativo asincrono.",
+    description: "Columnas de mejora, acuerdos y bloqueos para trabajo cooperativo asíncrono.",
     category: "proyecto",
     emoji: "🔁",
     elements: [
@@ -434,7 +434,7 @@ export const BOARD_TEMPLATES: BoardTemplate[] = [
     emoji: "🖥️",
     elements: [
       note(
-        "ESCRITORIO DOCENTE\n\nAbre apps, recursos y consignas desde un unico board de clase.",
+        "ESCRITORIO DOCENTE\n\nAbre apps, recursos y consignas desde un único board de clase.",
         "#fffaf0",
         40,
         50,

@@ -23,7 +23,7 @@ export const ACTIVITY_BLUEPRINTS: ActivityBlueprint[] = [
   {
     id: "base10-canje-234",
     title: "Construir y canjear 234",
-    objective: "Representar un numero con material Base 10, explicar su valor posicional y realizar canjes reversibles.",
+    objective: "Representar un número con material Base 10, explicar su valor posicional y realizar canjes reversibles.",
     profileId: "math",
     estimatedTimeMinutes: 25,
     evidencePolicy: "optional",
@@ -37,15 +37,15 @@ export const ACTIVITY_BLUEPRINTS: ActivityBlueprint[] = [
       },
       {
         type: "widget",
-        title: "Cuadricula de registro",
+        title: "Cuadrícula de registro",
         description: "Espacio para anotar equivalencias y verbalizaciones.",
         widgetType: "grid"
       }
     ],
     steps: [
       {
-        title: "Construccion inicial",
-        teacherNotes: "Pide al alumnado que represente 234 sin usar el numero escrito como unica pista.",
+        title: "Construcción inicial",
+        teacherNotes: "Pide al alumnado que represente 234 sin usar el número escrito como única pista.",
         studentPrompt: "Construye 234 con centenas, decenas y unidades.",
         durationMinutes: 8,
         expectedEvidence: "boardSnapshot"
@@ -112,7 +112,7 @@ export const ACTIVITY_BLUEPRINTS: ActivityBlueprint[] = [
       {
         title: "Cierre y portavoz",
         teacherNotes: "Cada equipo comparte logro, bloqueo y siguiente paso.",
-        studentPrompt: "Resume logro, bloqueo y proximo paso.",
+        studentPrompt: "Resume logro, bloqueo y próximo paso.",
         durationMinutes: 10,
         expectedEvidence: "text"
       }
@@ -121,7 +121,7 @@ export const ACTIVITY_BLUEPRINTS: ActivityBlueprint[] = [
   {
     id: "calma-respiracion-3min",
     title: "Rutina de respiracion de 3 minutos",
-    objective: "Facilitar una transicion breve de calma con apoyo visual, temporizador y consigna clara.",
+    objective: "Facilitar una transición breve de calma con apoyo visual, temporizador y consigna clara.",
     profileId: "calm",
     estimatedTimeMinutes: 8,
     evidencePolicy: "none",
@@ -130,7 +130,7 @@ export const ACTIVITY_BLUEPRINTS: ActivityBlueprint[] = [
       {
         type: "link",
         title: "Breath EDUmind",
-        description: "Respiracion guiada embebida en el board.",
+        description: "Respiración guiada embebida en el board.",
         url: "https://breath.edumind.es/?embed=1&board=1"
       },
       {
@@ -144,12 +144,12 @@ export const ACTIVITY_BLUEPRINTS: ActivityBlueprint[] = [
       {
         title: "Preparacion",
         teacherNotes: "Baja estimulo visual, proyecta el board y marca la consigna.",
-        studentPrompt: "Adopta una postura comoda y mira la guia visual.",
+        studentPrompt: "Adopta una postura cómoda y mira la guía visual.",
         durationMinutes: 2,
         expectedEvidence: "none"
       },
       {
-        title: "Respiracion guiada",
+        title: "Respiración guiada",
         teacherNotes: "Mantener ritmo estable. No introducir explicaciones largas durante la rutina.",
         studentPrompt: "Sigue el ritmo: inhala, mantiene y exhala.",
         durationMinutes: 3,
