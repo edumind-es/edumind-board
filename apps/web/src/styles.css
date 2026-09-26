@@ -2465,10 +2465,20 @@ button.danger {
     padding: 8px;
   }
 
-  .brand,
   .topbar select,
   .zoom-controls {
     display: none;
+  }
+
+  /* La marca (con el h1 de la página) se oculta solo visualmente: el lector
+     de pantalla sigue teniendo un encabezado de nivel 1 en móvil. */
+  .brand {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   .toolbar {

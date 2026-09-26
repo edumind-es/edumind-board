@@ -75,7 +75,7 @@ export function Inspector() {
 
   if (!element) {
     return (
-      <aside className="inspector">
+      <aside className="inspector" aria-label="Inspector del elemento">
         <p className="inspector-hint">Selecciona un elemento para editar su contenido.</p>
       </aside>
     );
@@ -106,7 +106,7 @@ export function Inspector() {
   };
 
   return (
-    <aside className="inspector">
+    <aside className="inspector" aria-label="Inspector del elemento">
       <p className="inspector-type">{etiquetaTipo[element.type] ?? element.type}</p>
 
       {/* Barra de acciones — estable, sin cálculos de posición */}

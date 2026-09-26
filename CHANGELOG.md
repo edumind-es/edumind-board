@@ -13,7 +13,9 @@ Revisión con la rúbrica VCER (evaluación del 2026-09-25).
 - **Accesibilidad:** vía de teclado y lector de pantalla para el lienzo (lista
   accesible de elementos: flechas, Mayús+flechas, Enter); etiqueta en el
   selector de tema; contraste de «Iniciar sesión» a 5,2:1; filas de la
-  biblioteca sin controles anidados; `<main>` y `h1`.
+  biblioteca sin controles anidados; `<main>` y `h1` (también en la vista del
+  alumnado y en móvil); landmarks con nombre. Cero violaciones de axe-core en
+  inicio, biblioteca, 375 px y sala.
 - **Contenido:** tildes en actividades y plantillas.
 - **Documentación:** `CREDITS.md`, `DECISIONES.md`, este registro; README con
   qué hace, qué guarda, con qué se comunica, cómo modificarlo y «Hecho con IA».

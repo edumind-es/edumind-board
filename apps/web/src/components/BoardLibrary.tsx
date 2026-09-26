@@ -71,7 +71,7 @@ export function BoardLibrary({
     );
 
   return (
-    <aside className="board-library">
+    <aside className="board-library" aria-label="Biblioteca de boards">
       {/* Tabs */}
       <div className="library-tabs">
         <button
