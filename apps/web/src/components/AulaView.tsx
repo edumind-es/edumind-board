@@ -97,12 +97,17 @@ export function AulaView({ code }: { code: string }) {
           <input
             type="text"
             placeholder="Tu nombre (opcional)"
+            aria-label="Tu nombre (opcional)"
+            aria-describedby="aula-aviso-nombre"
             value={studentLabel}
             maxLength={40}
             onChange={(e) => setStudentLabel(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") enterAula(); }}
             autoFocus
           />
+          <p id="aula-aviso-nombre" className="aula-aviso">
+            Puedes poner un alias. Tus respuestas las ve solo tu docente y el servidor las borra a las 24 horas.
+          </p>
           <button type="button" className="primary" onClick={enterAula}>
             Entrar a la sala
           </button>

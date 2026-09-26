@@ -415,6 +415,24 @@ describe("sala de clase", () => {
     expect(responses.json().responses[0].studentLabel).toBe("Alumno 1");
   });
 
+  it("las respuestas del alumnado se purgan pasada la retención", async () => {
+    const code = await createSala();
+    await app.inject({
+      method: "POST",
+      url: `/api/sala/${code}/response`,
+      payload: { type: "hand", payload: {}, studentLabel: "Alumna vieja" }
+    });
+    // Envejece la respuesta más allá de las 24 h por defecto
+    const { db } = await import("../src/db.js");
+    const hace2Dias = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+    db.prepare("UPDATE classroom_responses SET created_at = ? WHERE session_code = ?").run(hace2Dias, code);
+
+    // Abrir una sala nueva dispara la purga
+    await createSala();
+    const quedan = db.prepare("SELECT COUNT(*) as n FROM classroom_responses WHERE session_code = ?").get(code) as { n: number };
+    expect(quedan.n).toBe(0);
+  });
+
   it("cerrar la sala la desactiva para los alumnos", async () => {
     const code = await createSala();
     await app.inject({ method: "DELETE", url: `/api/sala/${code}`, headers: { cookie: cookieFor(owner) } });

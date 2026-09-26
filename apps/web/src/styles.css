@@ -2208,6 +2208,7 @@ button.danger {
 }
 
 .aula-enter-card input::placeholder { color: rgba(255,255,255,0.4); }
+.aula-enter-card .aula-aviso { font-size: 13px; opacity: 0.85; }
 
 .aula-enter-card .primary {
   background: #2a7a6d;
