@@ -288,11 +288,8 @@ Los cambios visuales relevantes deben cubrir:
 
 ## 11. Despliegue
 
-Destino actual:
-
-```text
-/var/www/edumind_board
-```
+Destino: la carpeta del repositorio en el servidor (`apps/web/dist` servido
+como estático y `apps/api` detrás de un proxy inverso).
 
 Flujo esperado:
 
