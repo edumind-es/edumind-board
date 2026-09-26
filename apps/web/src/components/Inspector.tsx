@@ -3,6 +3,7 @@ import { ArrowDown, ArrowUp, Copy, Lock, Trash2, Unlock } from "lucide-react";
 import { isAllowedEmbedUrl, type BoardElement } from "@edumind-board/shared";
 import { searchArasaac as searchArasaacApi, type ArasaacPictogram } from "../lib/api";
 import { useBoardStore } from "../lib/store";
+import { etiquetaTipo } from "../lib/etiquetasElementos";
 import { HUB_APPS } from "../lib/hubApps";
 import { newId } from "../lib/ids";
 import { NIVELES_VOZ } from "../lib/nivelesVoz";
@@ -74,25 +75,12 @@ export function Inspector() {
 
   if (!element) {
     return (
-      <aside className="inspector">
+      <aside className="inspector" aria-label="Inspector del elemento">
         <p className="inspector-hint">Selecciona un elemento para editar su contenido.</p>
       </aside>
     );
   }
 
-  const typeLabel: Record<BoardElement["type"], string> = {
-    note: "Nota", text: "Texto", image: "Imagen", file: "Archivo",
-    iframe: "Web", musica: "Música", timer: "Temporizador", semaphore: "Semáforo",
-    clock: "Reloj", dice: "Dado", spinner: "Ruleta",
-    guidelines: "Pauta escritura", math: "Matemáticas", base10: "Base 10", mates3d: "Mates 3D", mindmap: "Mapa mental", dictadoNum: "Dictado numérico",
-    fraction: "Fracciones", algorithm: "Algoritmo", logic: "Lógica matemática",
-    grid: "Cuadrícula", table: "Tabla",
-    comment: "Comentario",
-    connector: "Conector",
-    flow: "Diagrama de flujo",
-    pictos: "Pictogramas ARASAAC",
-    drawing: "Lienzo libre", noise: "Ruido", qr: "Código QR", hub: "App EDUmind"
-  };
 
   const noteFontSize = Math.max(10, Math.min(60, Math.round(element.height / 8)));
   const fixAsBackground = () => {
@@ -118,8 +106,8 @@ export function Inspector() {
   };
 
   return (
-    <aside className="inspector">
-      <p className="inspector-type">{typeLabel[element.type] ?? element.type}</p>
+    <aside className="inspector" aria-label="Inspector del elemento">
+      <p className="inspector-type">{etiquetaTipo[element.type] ?? element.type}</p>
 
       {/* Barra de acciones — estable, sin cálculos de posición */}
       <div className="inspector-actions">

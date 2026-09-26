@@ -59,8 +59,8 @@ if (faltan.length > 0) {
             faltan.map((host) => `      ${host}`).join("\n") +
             `\n\n  El esquema los admitiría y el navegador dejaría el marco en blanco,\n` +
             `  sin ningún error visible para el docente.\n\n` +
-            `  Arréglalo con:\n` +
-            `      sudo python3 /var/www/.edumind_ops/board_csp_frame_src.py\n`
+            `  Arréglalo añadiendo esos dominios al frame-src del fichero de\n` +
+            `  cabeceras de nginx y recargando nginx.\n`
     );
     process.exit(1);
 }

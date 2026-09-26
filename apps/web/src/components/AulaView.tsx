@@ -89,7 +89,7 @@ export function AulaView({ code }: { code: string }) {
   // ── Pantalla de entrada ────────────────────────────────────────────────────
   if (status === "entering") {
     return (
-      <div className="aula-enter">
+      <main className="aula-enter">
         <div className="aula-enter-card">
           <div className="aula-code-big">{code}</div>
           <h1>Sala de clase</h1>
@@ -97,48 +97,53 @@ export function AulaView({ code }: { code: string }) {
           <input
             type="text"
             placeholder="Tu nombre (opcional)"
+            aria-label="Tu nombre (opcional)"
+            aria-describedby="aula-aviso-nombre"
             value={studentLabel}
             maxLength={40}
             onChange={(e) => setStudentLabel(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") enterAula(); }}
             autoFocus
           />
+          <p id="aula-aviso-nombre" className="aula-aviso">
+            Puedes poner un alias. Tus respuestas las ve solo tu docente y el servidor las borra a las 24 horas.
+          </p>
           <button type="button" className="primary" onClick={enterAula}>
             Entrar a la sala
           </button>
         </div>
-      </div>
+      </main>
     );
   }
 
   if (status === "notfound") {
     return (
-      <div className="aula-enter">
+      <main className="aula-enter">
         <div className="aula-enter-card">
           <div className="aula-code-big">⚠</div>
           <h1>Sala no encontrada</h1>
           <p>El código <strong>{code}</strong> no corresponde a ninguna sala activa.</p>
           <p>Pide al docente que te dé el código correcto.</p>
         </div>
-      </div>
+      </main>
     );
   }
 
   if (status === "ended") {
     return (
-      <div className="aula-enter">
+      <main className="aula-enter">
         <div className="aula-enter-card">
           <div className="aula-code-big">✓</div>
           <h1>Sesión finalizada</h1>
           <p>El docente ha cerrado la sala. ¡Hasta la próxima!</p>
         </div>
-      </div>
+      </main>
     );
   }
 
   // ── Vista principal del alumno ─────────────────────────────────────────────
   return (
-    <div className="aula-shell">
+    <main className="aula-shell">
       {/* guestMode: alumnos sin cuenta EDUmind acceden a apps hub via guestUrl */}
       {board ? (
         <BoardCanvas board={board} readonly presentation liveControls guestMode />
@@ -183,6 +188,6 @@ export function AulaView({ code }: { code: string }) {
           <span className="aula-sent-indicator">Enviado {lastResponse}</span>
         )}
       </div>
-    </div>
+    </main>
   );
 }

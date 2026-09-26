@@ -8,7 +8,7 @@
  * primero, asi que durante unos segundos se sirve un directorio a medias, y
  * el marcador .commit desaparece.
  *
- * Estaba escrito en CLAUDE.md y aun asi paso. Una regla que depende de que
+ * Estaba escrito en la documentacion y aun asi paso. Una regla que depende de que
  * alguien la recuerde no es una regla.
  *
  * El despliegue no se ve afectado: compila con --outDir a la release nueva,
@@ -41,8 +41,8 @@ if (info.isSymbolicLink()) {
             `  ${dist} es un enlace simbolico a la version que se esta\n` +
             `  sirviendo ahora mismo. Compilar encima la vacia y deja el sitio\n` +
             `  a medias mientras dura.\n\n` +
-            `  Usa  ./desplegar.sh  desde la raiz del repo: compila en una\n` +
-            `  version nueva y mueve el enlace de golpe.\n\n` +
+            `  Compila en una carpeta nueva y mueve el enlace de golpe cuando\n` +
+            `  la verificacion haya pasado (asi hay vuelta atras).\n\n` +
             `  Si de verdad quieres compilar suelto, apunta a otro sitio:\n` +
             `      npx vite build --outDir /tmp/lo-que-sea\n`
     );

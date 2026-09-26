@@ -41,8 +41,8 @@ if (bytesNginx < MAX_CUERPO_PETICION_BYTES) {
             `${NGINX_MAX_BODY_MB}m.\n\n` +
             `  Un tablero grande sería rechazado antes de llegar al servidor y el\n` +
             `  docente sólo vería un error genérico al publicar.\n\n` +
-            `  Arréglalo con:\n` +
-            `      sudo python3 /var/www/.edumind_ops/board_limite_subida.py\n`
+            `  Arréglalo subiendo client_max_body_size en el vhost de nginx\n` +
+            `  (${CONF}) y recargando nginx.\n`
     );
     process.exit(1);
 }

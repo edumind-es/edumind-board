@@ -15,6 +15,7 @@ import { BoardCanvas } from "./components/BoardCanvas";
 import { BoardLibrary } from "./components/BoardLibrary";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Inspector } from "./components/Inspector";
+import { ListaElementosAccesible } from "./components/ListaElementosAccesible";
 import { GlobalInkToolbar } from "./components/GlobalInkToolbar";
 import { ProjectorView } from "./components/ProjectorView";
 import { ResourcePicker } from "./components/ResourcePicker";
@@ -833,7 +834,7 @@ show();
       </div>
       <header className="topbar">
         <div className="brand">
-          <strong>EDUmind Board</strong>
+          <h1>EDUmind Board</h1>
           <span>{statusText(saveState)}</span>
         </div>
         <button type="button" className="icon-only" title="Biblioteca" aria-label="Abrir biblioteca de boards"
@@ -846,7 +847,7 @@ show();
           onChange={(event) => updateBoard({ title: event.target.value })}
           aria-label="Título del board"
         />
-        <select value={board.theme} onChange={(event) => setTheme(event.target.value as typeof board.theme)}>
+        <select value={board.theme} aria-label="Tema visual del board" onChange={(event) => setTheme(event.target.value as typeof board.theme)}>
           <option value="edumind">EDUmind</option>
           <option value="eink">E-Ink · Papel</option>
           <option value="ocean">Ocean</option>
@@ -1087,9 +1088,12 @@ show();
         />
       )}
 
-      <ErrorBoundary fallback={<div className="widget-error">Error en el canvas. Recarga la página.</div>}>
-        <BoardCanvas captureRef={captureFnRef} />
-      </ErrorBoundary>
+      <main aria-label="Lienzo del tablero">
+        <ErrorBoundary fallback={<div className="widget-error">Error en el canvas. Recarga la página.</div>}>
+          <BoardCanvas captureRef={captureFnRef} />
+        </ErrorBoundary>
+        <ListaElementosAccesible />
+      </main>
 
       <Inspector />
       <GlobalInkToolbar />

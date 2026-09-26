@@ -40,9 +40,15 @@ function salaSse(eventId: number, data: object) {
   return `id: ${eventId}\ndata: ${JSON.stringify(data)}\n\n`;
 }
 
-function pruneOldClassroomEvents() {
+/**
+ * Purga eventos Y respuestas del alumnado más antiguos que la retención
+ * (24 h por defecto). Las respuestas llevan un nombre opcional del alumno:
+ * no deben quedarse en el servidor más allá de la jornada en que se dieron.
+ */
+export function pruneOldClassroomData() {
   const cutoff = new Date(Date.now() - classroomEventRetentionHours * 60 * 60 * 1000).toISOString();
   db.prepare("DELETE FROM classroom_events WHERE created_at < ?").run(cutoff);
+  db.prepare("DELETE FROM classroom_responses WHERE created_at < ?").run(cutoff);
 }
 
 function getLastClassroomEventId(code: string, audience: ClassroomAudience) {
@@ -56,7 +62,7 @@ function publishClassroomEvent(code: string, audience: ClassroomAudience, data: 
   const info = db
     .prepare("INSERT INTO classroom_events (session_code, audience, event_json, created_at) VALUES (?, ?, ?, ?)")
     .run(code, audience, JSON.stringify(data), nowIso());
-  if (Number(info.lastInsertRowid) % 250 === 0) pruneOldClassroomEvents();
+  if (Number(info.lastInsertRowid) % 250 === 0) pruneOldClassroomData();
 
   const listeners = audience === "students" ? studentBus.get(code) : teacherBus.get(code);
   if (!listeners?.size) return;
@@ -97,6 +103,9 @@ export async function salaRoutes(app: FastifyInstance) {
   // Crear sala (docente)
   app.post("/api/sala", async (request, reply) => {
     const teacherId = requireTeacher(request);
+    // Cada sala nueva purga lo caducado: así la limpieza no depende del
+    // volumen de eventos ni de ninguna tarea programada.
+    pruneOldClassroomData();
     // Cierra sesiones activas previas de este docente
     db.prepare("UPDATE classroom_sessions SET active = 0 WHERE teacher_id = ? AND active = 1").run(teacherId);
     const code = generateSalaCode();

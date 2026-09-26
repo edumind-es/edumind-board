@@ -6,6 +6,8 @@ import "./config.js";
 export const authEnabled = process.env.AUTHENTIK_ENABLED === "true";
 export const appBaseUrl = (process.env.APP_BASE_URL ?? "http://localhost:5173").replace(/\/$/, "");
 export const webBaseUrl = (process.env.WEB_BASE_URL ?? appBaseUrl).replace(/\/$/, "");
+// Retención de la sala de clase: eventos y respuestas del alumnado (con su
+// nombre opcional) se borran del servidor pasadas estas horas.
 export const classroomEventRetentionHours = Math.max(1, Number(process.env.CLASSROOM_EVENT_RETENTION_HOURS ?? 24));
 export const arasaacCacheTtlHours = Math.max(1, Number(process.env.ARASAAC_CACHE_TTL_HOURS ?? 24 * 7));
 export const authIssuer = process.env.AUTHENTIK_ISSUER_URL?.replace(/\/$/, "");
