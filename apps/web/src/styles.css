@@ -264,8 +264,11 @@ button.danger {
   gap: 2px;
 }
 
-.brand strong {
+.brand h1 {
+  margin: 0;
   font-size: 16px;
+  font-weight: 700;
+  line-height: 1.2;
 }
 
 .brand span {
@@ -679,8 +682,19 @@ button.danger {
   border-color: var(--accent-2);
 }
 
-.board-row span {
+.board-row .board-row-open {
+  display: block;
   min-width: 0;
+  width: 100%;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
 .board-row strong,
@@ -1727,9 +1741,14 @@ button.danger {
 }
 
 .auth-pill-anon {
+  /* Tono profundo del mundo físico: 5,2:1 sobre el papel (el acento base daba 2,7:1) */
+  border-color: var(--lm-fisico-text);
+  color: var(--lm-fisico-text);
+  cursor: pointer;
+}
+.theme-eink .auth-pill-anon {
   border-color: var(--accent);
   color: var(--accent);
-  cursor: pointer;
 }
 
 .auth-pill-anon:hover {
@@ -3157,7 +3176,7 @@ a:focus-visible {
 .theme-eink .lm-plate-fixed {
   display: none; /* e-ink: sin color */
 }
-.topbar > .brand strong {
+.topbar > .brand h1 {
   font-family: var(--lm-display);
   font-weight: 800;
   letter-spacing: -0.02em;
@@ -3705,4 +3724,54 @@ a:focus-visible {
     background: var(--panel);
     color: inherit;
     font-size: 13px;
+}
+
+/* ── Lista accesible de elementos del lienzo ─────────────────────────
+   Oculta (pero en el orden de tabulación) hasta que recibe el foco; entonces
+   se muestra junto al lienzo para que también la vea quien usa teclado. */
+.lista-elementos-a11y {
+  position: fixed;
+  left: 124px;
+  bottom: 24px;
+  z-index: 60;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  margin: 0;
+  padding: 0;
+}
+.lista-elementos-a11y:focus-within {
+  width: min(340px, calc(100vw - 32px));
+  height: auto;
+  max-height: 40vh;
+  overflow: auto;
+  clip-path: none;
+  white-space: normal;
+  padding: 10px;
+  border: 2px solid var(--accent-2);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  outline: none;
+}
+.lista-elementos-a11y-ayuda {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.lista-elementos-a11y [role="option"] {
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.lista-elementos-a11y [role="option"][aria-selected="true"] {
+  background: color-mix(in srgb, var(--accent-2) 16%, transparent);
+  outline: 2px solid var(--accent-2);
+}
+@media (max-width: 720px) {
+  .lista-elementos-a11y { left: 16px; bottom: 112px; }
 }

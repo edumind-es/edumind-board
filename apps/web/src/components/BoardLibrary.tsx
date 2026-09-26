@@ -132,25 +132,26 @@ export function BoardLibrary({
               <div
                 key={summary.id}
                 className={`board-row ${summary.id === activeBoardId ? "is-active" : ""}`}
-                onClick={() => onOpen(summary.id)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") onOpen(summary.id);
-                }}
-                role="button"
-                tabIndex={0}
               >
-                <span>
+                {/* Botón real para abrir: antes era un div role="button" con botones dentro (interactivo anidado) */}
+                <button
+                  type="button"
+                  className="board-row-open"
+                  aria-current={summary.id === activeBoardId ? "true" : undefined}
+                  onClick={() => onOpen(summary.id)}
+                >
                   <strong>{summary.title}</strong>
                   <small>
                     {summary.elementCount} elem. · {formatDate(summary.updatedAt)}
                   </small>
-                </span>
+                </button>
                 <div className="board-row-actions">
                   <button
                     type="button"
                     className="icon-only"
                     title="Duplicar board"
-                    onClick={(e) => { e.stopPropagation(); onDuplicate(summary.id); }}
+                    aria-label={`Duplicar «${summary.title}»`}
+                    onClick={() => onDuplicate(summary.id)}
                   >
                     <Copy size={14} />
                   </button>
@@ -158,7 +159,8 @@ export function BoardLibrary({
                     type="button"
                     className="icon-only icon-danger"
                     title="Eliminar board local"
-                    onClick={(e) => { e.stopPropagation(); onDelete(summary.id); }}
+                    aria-label={`Eliminar «${summary.title}»`}
+                    onClick={() => onDelete(summary.id)}
                   >
                     <Trash2 size={14} />
                   </button>
